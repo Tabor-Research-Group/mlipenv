@@ -1,19 +1,16 @@
 {
-    "method": 
+    "method": "optimize",
+    "options":
     { 
-        "type": "optimize",
-        "options": 
+        "charge": 1,
+        "spin": 0,
+        "optimizer": 
         {
-            "optimizer": 
+            "type": "ase", 
+            "options": 
             {
-                "type": "ase", 
-                "options": 
-                {
-                    "charge": 1,
-                    "spin": 0,
-                    "fmax": 0.02,
-                    "steps": 5
-                }
+                "fmax": 0.02,
+                "steps": 5
             }
         }
     },

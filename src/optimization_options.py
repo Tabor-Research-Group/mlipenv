@@ -1,10 +1,26 @@
 from dataclasses import dataclass
 
 @dataclass
-class ASEOptOpts:
-    charge: float = 0.0
-    spin: float = 1.0
+class OptimizerConfiguration:
+    type: str
+
+@dataclass
+class ASEOptimizerConfiguration(OptimizerConfiguration):
     fmax: float = 0.02
-    steps: int = 20
+    steps: int = 5
     logging: str = ""
-    
+
+@dataclass
+class OptimizationConfiguration:
+    type: str
+    charge: float
+    spin: float
+    optimizer: OptimizerConfiguration
+
+@dataclass
+class BaseConfiguration:
+    method: str
+    atoms: str
+    coordinates: str
+    output_dir: str
+    options: OptimizationConfiguration

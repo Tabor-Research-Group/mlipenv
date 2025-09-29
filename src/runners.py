@@ -12,17 +12,19 @@ class BaseOptimizationRunner:
         self.coordinates = coordinates
 
     def export_results(self, output_dir):
-        atom_symbols, coordinates, gradients = self.format_results()
+        atom_symbols, coordinates, gradients, energies = self.format_results()
         np.savez(os.path.join(output_dir, "atoms.npz"), atom_symbols)
         np.savez(os.path.join(output_dir, "coordinates.npz"), coordinates)
         np.savez(os.path.join(output_dir, "gradients.npz"), gradients)
+        np.savez(os.path.join(output_dir, "energies.npz"), energies)
 
     def format_results(self):
         results = self.results
         atom_symbols = np.array([self.get_atom_symbols(obj) for obj in results])
         coordinates = np.array([self.get_coordinates(obj) for obj in results])
         gradients = np.array([self.get_gradients(obj) for obj in results])
-        return atom_symbols, coordinates, gradients
+        energies = np.array([self.get_single_point_energy(obj) for obj in results])
+        return atom_symbols, coordinates, gradients, energies
         
     @abc.abstractmethod
     def run(self):
@@ -49,8 +51,8 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
         self.load_config_with_defaults(config)
 
     def load_config_with_defaults(self, config):
-        from src.optimization_options import ASEOptOpts
-        self.options = ASEOptOpts(**config)
+        from src.optimization_options import ASEOptimizerConfiguration
+        self.options = ASEOptimizerConfiguration(**config)
     
     def run(self):
         optimized_atoms = [self.run_opt(a, c) for a, c in zip(self.atoms, self.coordinates)]

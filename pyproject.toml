@@ -1,0 +1,33 @@
+# pyproject.toml
+[build-system]
+requires = ["setuptools>=61.0", "wheel"] # wheel is generally good to include
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlipenv"
+version = "1"
+description = "A short description of my package."
+readme = "README.md"
+requires-python = ">=3.0"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Jackson Schwedler", email = "jaschwedler@tamu.edu" },
+]
+dependencies = [ # Runtime dependencies
+]
+
+#[project.urls] # Optional: Links for your project
+#Homepage = "https://github.com/youruser/my-awesome-package"
+#"Bug Tracker" = "https://github.com/youruser/my-awesome-package/issues"
+
+[tool.setuptools.packages] # How setuptools finds packages if not using find_packages()
+find = {} # Use default find_packages() behavior
+# Alternatively, you could explicitly list packages:
+# packages = ["my_awesome_package"]
+
+# [tool.setuptools.package-data] # If you have non-Python files to include
+# "my_awesome_package" = ["data/*.txt"]
+
+# You can add other configurations for tools here, e.g., for pytest, ruff, etc.
+# [tool.pytest.ini_options]
+# addopts = "--strict-markers"
