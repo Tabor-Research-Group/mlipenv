@@ -53,9 +53,12 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
     def load_config_with_defaults(self, config):
         from src.optimization_options import ASEOptimizerConfiguration
         self.options = ASEOptimizerConfiguration(**config)
+        if isinstance(self.options.charge, float):
+            self.options.charge = [self.options.charge] * len(self.coordinates)
     
     def run(self):
-        optimized_atoms = [self.run_opt(a, c) for a, c in zip(self.atoms, self.coordinates)]
+        optimized_atoms = [self.run_opt(atoms, coords, charge) 
+                           for atoms, coords, charge in zip(self.atoms, self.coordinates, self.options.charge)]
         self.results = optimized_atoms
     
     def get_atom_symbols(self, obj):
@@ -67,9 +70,9 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
     def get_single_point_energy(self, obj):
         return np.array(obj.calc.get_potential_energy())
 
-    def run_opt(self, atom_symbols, coordinates):
+    def run_opt(self, atom_symbols, coordinates, charge):
         atoms = Atoms(symbols=atom_symbols, positions=coordinates)
-        atoms.info["charge"] = self.options.charge
+        atoms.info["charge"] = charge
         atoms.info["spin"] = self.options.spin
         calc = get_calc()
         atoms.calc = calc

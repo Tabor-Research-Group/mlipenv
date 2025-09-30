@@ -13,7 +13,7 @@ class ASEOptimizerConfiguration(OptimizerConfiguration):
 @dataclass
 class OptimizationConfiguration:
     type: str
-    charge: float
+    charge: float | list[float]
     spin: float
     optimizer: OptimizerConfiguration
 
