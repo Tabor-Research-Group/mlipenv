@@ -1,12 +1,12 @@
 from dataclasses import dataclass
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Tuple
 
 from src.enums.output_enum import _output_file_registry
 
 @dataclass
 class OptimizerConfiguration:
     logging: str = ""
-    output: Union[str, List[str]] = _output_file_registry().keys()
+    output: Union[str, Tuple[str]] = tuple(_output_file_registry().keys())
 
 @dataclass
 class ASEOptimizerConfiguration(OptimizerConfiguration):

@@ -12,7 +12,7 @@ def configuration_builder(method, atoms, coordinates, output_dir=".", **kwargs):
         raise NotImplementedError
     return asdict(BaseConfiguration(method, atoms, coordinates, output_dir, options))
 
-def build_optimization_config(optimizer, charge=0, spin=1.0, **kwargs):
+def build_optimization_config(optimizer, charge=0, spin=1, **kwargs):
     optimizer = optimizer.lower()
     if optimizer == "ase":
         config = ASEOptimizerConfiguration(**kwargs)

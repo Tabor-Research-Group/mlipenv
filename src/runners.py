@@ -13,6 +13,14 @@ class BaseOptimizationRunner:
         self.atoms = atoms
         self.coordinates = coordinates
 
+    def load_config_with_defaults(self, config):
+        self.charge = config.charge
+        self.spin = config.spin
+        if isinstance(self.charge, int):
+            self.charge = [self.charge] * len(self.coordinates)
+        if len(self.atoms) < len(self.coordinates):
+            self.atoms = self.atoms[:-1] + [self.atoms[-1]] * (len(self.coordinates) - len(self.atoms) + 1)
+
     def export_results(self, output_dir):
         # not explicitly enforcing alignment here. relying on default ordering given by
         # self.result_getters and src.enums.output_enum._output_file_registry
@@ -28,7 +36,7 @@ class BaseOptimizationRunner:
         return [self.get_atom_symbols, self.get_coordinates, self.get_gradients, self.get_single_point_energy]
     
     def get_output_with_defaults(self, output_dir):
-        output_files = [_output_file_registry()[k] for k in self.options.output]
+        output_files = [_output_file_registry()[k].value for k in self.options.output]
         return [os.path.join(output_dir, file) for file in output_files]
         
     @abc.abstractmethod
@@ -56,15 +64,12 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
         self.load_config_with_defaults(config)
 
     def load_config_with_defaults(self, config):
+        super().load_config_with_defaults(config)
         self.options = ASEOptimizerConfiguration(**config.options)
-        if isinstance(self.options.charge, float):
-            self.options.charge = [self.options.charge] * len(self.coordinates)
-        if len(self.atoms) < len(self.coordinates):
-            self.atoms = self.atoms[:-1] + [self.atoms[-1]] * (len(self.coordinates) - len(self.atoms) + 1)
     
     def run(self):
         optimized_atoms = [self.run_opt(atoms, coords, charge) 
-                           for atoms, coords, charge in zip(self.atoms, self.coordinates, self.options.charge)]
+                           for atoms, coords, charge in zip(self.atoms, self.coordinates, self.charge)]
         self.results = optimized_atoms
     
     def get_atom_symbols(self, obj):
@@ -79,7 +84,7 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
     def run_opt(self, atom_symbols, coordinates, charge):
         atoms = Atoms(symbols=atom_symbols, positions=coordinates)
         atoms.info["charge"] = charge
-        atoms.info["spin"] = self.options.spin
+        atoms.info["spin"] = self.spin
         calc = get_calc()
         atoms.calc = calc
         atoms = self._run_opt(atoms)

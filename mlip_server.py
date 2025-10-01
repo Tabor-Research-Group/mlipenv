@@ -33,8 +33,8 @@ class MLIPHandler(NodeCommHandler):
                 }
             except:
                 response = {
-                    "stdout": "",
-                    "stderr": traceback.format_exc(limit=5)
+                    "stdout": buffer.getvalue(),
+                    "stderr": traceback.format_exc(limit=10)
                 }
         return response 
 
