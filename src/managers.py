@@ -4,7 +4,7 @@ import abc
 import numpy as np
 
 from src.runners import ASEOptimizationRunner, SciPyOptimizationRunner, MarksOptimizationRunner
-from optimization_options import OptimizationConfiguration
+from src.optimization_options import OptimizationConfiguration
 
 class BaseManager:
     def __init__(self, config):

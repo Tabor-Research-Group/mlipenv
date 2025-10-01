@@ -20,12 +20,10 @@ class BaseOptimizationRunner:
         np.savez(os.path.join(output_dir, "energies.npz"), energies)
 
     def format_results(self):
-        results = self.results
-        atom_symbols = np.array([self.get_atom_symbols(obj) for obj in results])
-        coordinates = np.array([self.get_coordinates(obj) for obj in results])
-        gradients = np.array([self.get_gradients(obj) for obj in results])
-        energies = np.array([self.get_single_point_energy(obj) for obj in results])
-        return atom_symbols, coordinates, gradients, energies
+        return [[f(obj) for obj in self.results] for f in self.result_getters()]
+    
+    def result_getters(self):
+        return [self.get_atom_symbols, self.get_coordinates, self.get_gradients, self.get_single_point_energy]
         
     @abc.abstractmethod
     def run(self):

@@ -3,13 +3,12 @@ from typing import List, Union, Dict
 
 @dataclass
 class OptimizerConfiguration:
-    type: str
+    logging: str = ""
 
 @dataclass
 class ASEOptimizerConfiguration(OptimizerConfiguration):
     fmax: float = 0.02
     steps: int = 5
-    logging: str = ""
 
 @dataclass
 class OptimizationConfiguration:
