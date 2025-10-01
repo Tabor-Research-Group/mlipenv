@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import List, Union, Dict
 
 @dataclass
 class OptimizerConfiguration:
@@ -12,10 +13,10 @@ class ASEOptimizerConfiguration(OptimizerConfiguration):
 
 @dataclass
 class OptimizationConfiguration:
-    type: str
-    charge: float | list[float]
+    optimizer: str
+    options: Union[Dict, OptimizerConfiguration]
+    charge: Union[float, List[float]]
     spin: float
-    optimizer: OptimizerConfiguration
 
 @dataclass
 class BaseConfiguration:
@@ -23,4 +24,4 @@ class BaseConfiguration:
     atoms: str
     coordinates: str
     output_dir: str
-    options: OptimizationConfiguration
+    options: Union[Dict, OptimizationConfiguration]

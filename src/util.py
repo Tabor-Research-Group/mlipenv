@@ -12,14 +12,15 @@ def configuration_builder(method, atoms, coordinates, output_dir=".", **kwargs):
         raise NotImplementedError
     return asdict(BaseConfiguration(method, atoms, coordinates, output_dir, options))
 
-def build_optimization_config(type, charge="0", spin="1.0", **kwargs):
-    if type.lower() == "ase":
-        optimizer = ASEOptimizerConfiguration(type, **kwargs)
-    elif type.lower() == "scipy":
+def build_optimization_config(optimizer, charge=0, spin=1.0, **kwargs):
+    optimizer = optimizer.lower()
+    if optimizer == "ase":
+        config = ASEOptimizerConfiguration(**kwargs)
+    elif optimizer == "scipy":
         ...
-    elif "mark" in type.lower():
+    elif "mark" in optimizer:
         ...
-    return OptimizationConfiguration(type, charge, spin, optimizer)
+    return OptimizationConfiguration(optimizer, config, charge, spin)
 
 def build_energy_config(**kwargs):
     ...

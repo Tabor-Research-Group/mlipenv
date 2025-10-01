@@ -5,6 +5,7 @@ import numpy as np
 from ase import Atoms
 
 from src.calculators import get_calc
+from src.optimization_options import ASEOptimizerConfiguration
 
 class BaseOptimizationRunner:
     def __init__(self, atoms, coordinates):
@@ -51,10 +52,11 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
         self.load_config_with_defaults(config)
 
     def load_config_with_defaults(self, config):
-        from src.optimization_options import ASEOptimizerConfiguration
-        self.options = ASEOptimizerConfiguration(**config)
+        self.options = ASEOptimizerConfiguration(**config.options)
         if isinstance(self.options.charge, float):
             self.options.charge = [self.options.charge] * len(self.coordinates)
+        if len(self.atoms) < len(self.coordinates):
+            self.atoms = self.atoms[:-1] + [self.atoms[-1]] * (len(self.coordinates) - len(self.atoms) + 1)
     
     def run(self):
         optimized_atoms = [self.run_opt(atoms, coords, charge) 

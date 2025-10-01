@@ -1,5 +1,6 @@
 from io import StringIO
 from contextlib import redirect_stdout
+import traceback
 
 from servers.node_comm import *
 
@@ -9,7 +10,9 @@ class MLIPHandler(NodeCommHandler):
 
     def get_methods(self) -> 'dict[str,method]':
         return {
-            "evaluate": self.evaluate
+            "evaluate": self.evaluate,
+            "exit":self.stop_server,
+            "shutdown":self.stop_server,
         }
     
     def evaluate(self, args):
@@ -28,10 +31,10 @@ class MLIPHandler(NodeCommHandler):
                     "stdout": buffer.getvalue(),
                     "stderr": ""
                 }
-            except Exception as e:
+            except:
                 response = {
                     "stdout": "",
-                    "stderr": e
+                    "stderr": traceback.format_exc(limit=5)
                 }
         return response 
 

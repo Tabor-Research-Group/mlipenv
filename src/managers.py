@@ -4,15 +4,13 @@ import abc
 import numpy as np
 
 from src.runners import ASEOptimizationRunner, SciPyOptimizationRunner, MarksOptimizationRunner
+from optimization_options import OptimizationConfiguration
 
-atoms_key = "atoms"
-coordinates_key = "coordinates"
-output_dir_key = "output_dir"
 class BaseManager:
     def __init__(self, config):
-        self.atoms = self.load_atoms(config[atoms_key])
-        self.coordinates = self.load_coordinates(config[coordinates_key])
-        self.output_dir = config[output_dir_key]
+        self.atoms = self.load_atoms(config.atoms)
+        self.coordinates = self.load_coordinates(config.coordinates)
+        self.output_dir = config.output_dir
 
     def _load_parameter(self, parameter_bundle):
         if isinstance(parameter_bundle, str):
@@ -32,10 +30,10 @@ class BaseManager:
     
     def load_atoms(self, atoms_bundle):
         try:
-            coordinates = self._load_parameter(atoms_bundle)
+            atoms = self._load_parameter(atoms_bundle)
         except Exception as e:
             raise NotImplementedError(f"Could not load atoms from: {atoms_bundle}") from e
-        return coordinates
+        return atoms
         
     @abc.abstractmethod
     def run(self):
@@ -52,27 +50,19 @@ class EnergyManager(BaseManager):
     def compute_energy(self):
         ...
 
-
-method_info_key = "method"
-method_key = "type"
-method_options_key = "options"
-optimizer_info_key = "optimizer"
-optimizer_key = "type"
-optimizer_options_key = "options"
 class OptimizationManager(BaseManager):
     def __init__(self, config):
         super().__init__(config)
-        self.options = config[method_info_key][method_options_key]
+        self.config = OptimizationConfiguration(**config)
 
     def get_optimization_scheme(self):
-        requested_optimizer = self.options[optimizer_info_key][optimizer_key]
-        optimizer_options = self.options[optimizer_info_key][optimizer_options_key]
+        requested_optimizer = self.config.optimizer.lower()
         if requested_optimizer == "ase":
-            return ASEOptimizationRunner(self.atoms, self.coordinates, optimizer_options)
+            return ASEOptimizationRunner(self.atoms, self.coordinates, self.config)
         elif requested_optimizer == "scipy":
-            return SciPyOptimizationRunner(self.atoms, self.coordinates, optimizer_options)
-        elif "mark" in requested_optimizer.lower():
-            return MarksOptimizationRunner(self.atoms, self.coordinates, optimizer_options)
+            return SciPyOptimizationRunner(self.atoms, self.coordinates, self.config)
+        elif "mark" in requested_optimizer:
+            return MarksOptimizationRunner(self.atoms, self.coordinates, self.config)
         else:
             raise NotImplementedError(f"Unknown optimizer: {requested_optimizer}")
     

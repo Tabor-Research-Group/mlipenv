@@ -2,6 +2,7 @@ import os
 import json
 
 from src.managers import OptimizationManager, EnergyManager
+from src.optimization_options import BaseConfiguration
 
 # config:
 #   method: { type: , options: {}}
@@ -38,19 +39,15 @@ def load_config(config_bundle):
         config = config_bundle
     else:
         raise NotImplementedError(f"Intractable input type: {type(config_bundle)}")
-    return config
+    return BaseConfiguration(**config)
 
-method_info_key = "method"
-method_key = "type"
 def get_runner_for_method(config):
-    method_info = config[method_info_key]
-    method = method_info[method_key]
-    if method == "optimize":
+    if config.method == "optimize":
         return OptimizationManager(config)
-    elif method == "energy":
+    elif config.method == "energy":
         return EnergyManager(config)
     else:
-        raise NotImplementedError(f"Unknown method type: {method}")
+        raise NotImplementedError(f"Unknown method type: {config.method}")
 
 def call_to_mlip_server(config_bundle):
     config = load_config(config_bundle)
