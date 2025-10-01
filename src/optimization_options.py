@@ -1,9 +1,12 @@
 from dataclasses import dataclass
 from typing import List, Union, Dict
 
+from src.enums.output_enum import _output_file_registry
+
 @dataclass
 class OptimizerConfiguration:
     logging: str = ""
+    output: Union[str, List[str]] = _output_file_registry().keys()
 
 @dataclass
 class ASEOptimizerConfiguration(OptimizerConfiguration):

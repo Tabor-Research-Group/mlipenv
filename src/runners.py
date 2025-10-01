@@ -6,6 +6,7 @@ from ase import Atoms
 
 from src.calculators import get_calc
 from src.optimization_options import ASEOptimizerConfiguration
+from src.enums.output_enum import _output_file_registry
 
 class BaseOptimizationRunner:
     def __init__(self, atoms, coordinates):
@@ -13,17 +14,22 @@ class BaseOptimizationRunner:
         self.coordinates = coordinates
 
     def export_results(self, output_dir):
-        atom_symbols, coordinates, gradients, energies = self.format_results()
-        np.savez(os.path.join(output_dir, "atoms.npz"), atom_symbols)
-        np.savez(os.path.join(output_dir, "coordinates.npz"), coordinates)
-        np.savez(os.path.join(output_dir, "gradients.npz"), gradients)
-        np.savez(os.path.join(output_dir, "energies.npz"), energies)
+        # not explicitly enforcing alignment here. relying on default ordering given by
+        # self.result_getters and src.enums.output_enum._output_file_registry
+        formatted_results = self.format_results()
+        output_paths = self.get_output_with_defaults(output_dir)
+        for loc, res in zip(output_paths, formatted_results):
+            np.savez(loc, res)
 
     def format_results(self):
         return [[f(obj) for obj in self.results] for f in self.result_getters()]
     
     def result_getters(self):
         return [self.get_atom_symbols, self.get_coordinates, self.get_gradients, self.get_single_point_energy]
+    
+    def get_output_with_defaults(self, output_dir):
+        output_files = [_output_file_registry()[k] for k in self.options.output]
+        return [os.path.join(output_dir, file) for file in output_files]
         
     @abc.abstractmethod
     def run(self):
