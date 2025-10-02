@@ -56,7 +56,6 @@ class NodeCommClient:
             raise NotImplementedError(mode)
         self.timeout = timeout
 
-
     SEND_CWD = True
     def prep_command_env(self):
         env = {}
@@ -108,12 +107,12 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
         except:
             response = {
                 "stdout": "",
-                "stderr": traceback.format_exc(limit=1)
+                "stderr": traceback.format_exc(limit=10)
             }
         try:
             self.wfile.write(json.dumps(response).encode() + b'\n')
         except:
-            traceback.print_exc(limit=1)  # big ol' fallback
+            traceback.print_exc(limit=10)  # big ol' fallback
 
     def handle_json_request(self, message: bytes):
         try:
@@ -121,7 +120,7 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
         except:
             response = {
                 "stdout": "",
-                "stderr": traceback.format_exc(limit=1)
+                "stderr": traceback.format_exc(limit=10)
             }
         else:
             comm = request.get("command", '<unknown>')
@@ -185,7 +184,7 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
                     except:
                         response = {
                             "stdout": "",
-                            "stderr": traceback.format_exc(limit=1)
+                            "stderr": traceback.format_exc(limit=10)
                         }
 
         return response
@@ -211,14 +210,11 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
             git_port = max_port - (git_port % (max_port - min_port))
         return git_port
 
-    TCP_SERVER = NodeCommTCPServer
-    UNIX_SERVER = NodeCommUnixServer
     DEFAULT_CONNECTION = ("localhost", 9999)
     DEFAULT_PORT_ENV_VAR = None
     DEFAULT_SOCKET_ENV_VAR = None
     @classmethod
-    def start_server(cls, connection=None, port=None):
-        # Create the server, binding to localhost on port 9999
+    def infer_connection(cls, connection, port):
         if connection is None and cls.DEFAULT_SOCKET_ENV_VAR is not None:
             connection = os.environ.get(cls.DEFAULT_SOCKET_ENV_VAR)
         if connection is None:
@@ -228,15 +224,37 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
                 connection = ('localhost', cls.get_valid_port(port))
         if connection is None:
             connection = cls.DEFAULT_CONNECTION
-        mode = infer_mode(connection)
-        print(f"Starting server at {connection} over {mode}")
+        return connection
+
+    @classmethod
+    def set_server(cls, server):
+        cls.server = server
+    
+    @classmethod
+    def get_server(cls):
+        return cls.server
+
+    TCP_SERVER = NodeCommTCPServer
+    UNIX_SERVER = NodeCommUnixServer
+    @classmethod
+    def get_server_type(cls, mode):
         if mode == "TCP":
             server_type = cls.TCP_SERVER
         elif mode == "Unix":
             server_type = cls.UNIX_SERVER
         else:
             raise NotImplementedError(mode)
+        return server_type
+
+    @classmethod
+    def start_server(cls, connection=None, port=None):
+        # start the server; default binding is to localhost on port 9999
+        connection = cls.infer_connection(connection, port)
+        mode = infer_mode(connection)
+        print(f"Starting server at {connection} over {mode}")
+        server_type = cls.get_server_type(mode)
         with server_type(connection, cls) as server:
+            cls.set_server(server)
             # Activate the server; this will keep running until you
             # interrupt the program with Ctrl-C
             server.serve_forever()
@@ -245,6 +263,18 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
                     os.remove(connection)
                 except OSError:
                     ...
+
+    @classmethod
+    def stop_server(cls):
+        print("stopping server...")
+        server = cls.get_server()
+        print(server)
+        if server:
+            print("server!")
+            server.shutdown()
+            cls.set_server(None)
+        else:
+            print("We couldn't find a server to shutdown.")
 
     client_class = NodeCommClient
     @classmethod

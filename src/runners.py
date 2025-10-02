@@ -27,7 +27,7 @@ class BaseOptimizationRunner:
         formatted_results = self.format_results()
         output_paths = self.get_output_with_defaults(output_dir)
         for loc, res in zip(output_paths, formatted_results):
-            np.savez(loc, res)
+            np.savez(loc, *res)
 
     def format_results(self):
         return [[f(obj) for obj in self.results] for f in self.result_getters()]

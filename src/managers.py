@@ -16,7 +16,16 @@ class BaseManager:
         if isinstance(parameter_bundle, str):
             if os.path.exists(parameter_bundle):
                 data = np.load(parameter_bundle)
-                parameter = [data[key] for key in data.files]
+                if len(data.files) > 1:
+                    parameter = [data[key] for key in data.files]
+                else:
+                    parameter = data[data.files[0]]
+                    # runners enforce one-at-a-time batching, if the input
+                    # is a multi-dim np array, we splice it up here.
+                    if parameter.ndim > 1:
+                        parameter = [parameter[i] for i in parameter.shape[0]]
+                    else:
+                        parameter = [parameter]
         elif isinstance(parameter_bundle, list):
             parameter = parameter_bundle
         return parameter

@@ -11,8 +11,8 @@ class MLIPHandler(NodeCommHandler):
     def get_methods(self) -> 'dict[str,method]':
         return {
             "evaluate": self.evaluate,
-            "exit":self.stop_server,
-            "shutdown":self.stop_server,
+            "exit": self.stop_server,
+            "shutdown": self.stop_server,
         }
     
     def evaluate(self, args):
@@ -40,8 +40,7 @@ class MLIPHandler(NodeCommHandler):
 
     @classmethod
     def stop_server(cls, args):
-        cls.MLIP_SERVING = False
-        raise KeyboardInterrupt
+        super(MLIPHandler, cls).stop_server()
 
 if __name__ == "__main__":
     import sys, os
