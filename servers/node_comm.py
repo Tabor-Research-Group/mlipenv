@@ -4,7 +4,7 @@ different nodes in SLURM systems
 """
 import abc
 import os
-import socket, socketserver, json, traceback, subprocess
+import socket, socketserver, json, traceback, subprocess, threading
 import sys
 
 __all__ = [
@@ -137,7 +137,9 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
         return dict(
             {
                 "cd": self.change_pwd,
-                "pwd": self.get_pwd
+                "pwd": self.get_pwd,
+                "exit": self.stop_server,
+                "shutdown": self.stop_server
             },
             **self.get_methods()
         )
@@ -265,16 +267,18 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
                     ...
 
     @classmethod
-    def stop_server(cls):
-        print("stopping server...")
+    def _shutdown_server(cls):
         server = cls.get_server()
-        print(server)
-        if server:
-            print("server!")
-            server.shutdown()
-            cls.set_server(None)
-        else:
-            print("We couldn't find a server to shutdown.")
+        server.shutdown()
+        cls.set_server(None)
+
+    @classmethod
+    def stop_server(cls, args):
+        threading.Thread(target=cls._shutdown_server).start()
+        return {
+            "stdout": "shutting down server...",
+            "stderr": ""
+        }
 
     client_class = NodeCommClient
     @classmethod
