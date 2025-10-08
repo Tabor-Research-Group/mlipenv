@@ -9,12 +9,28 @@ def get_calc(**kwargs):
     elif calculator == "mace":
         return get_mace_calc(**kwargs)
     else:
-        raise NotImplementedError("be careful messing with `CALCULATOR` environment variable!")
+        raise ValueError("be careful messing with `CALCULATOR` environment variable!")
 
-def get_fairchem_calc(predict_unit="uma-s-1p1", device="cpu", task_name="omol"):
-    from fairchem.core.calculate.pretrained_mlip import get_predict_unit
+MODEL_CACHE_DIR = "MODEL_CACHE_DIR"
+DEFAULT_CACHE_DIR = "DEFAULT_MODEL_CACHE_DIR"
+def get_fairchem_calc(model="uma-s-1p1", task_name="omol", device="cpu"):
+    try:
+        if MODEL_CACHE_DIR in os.environ:
+            cache_dir = os.environ[MODEL_CACHE_DIR]
+        else:
+            cache_dir = os.environ[DEFAULT_CACHE_DIR]
+    except:
+        raise ValueError(f"either `{MODEL_CACHE_DIR}` or `{DEFAULT_CACHE_DIR}` must be set at the environment level")
+
+    from fairchem.core.calculate.pretrained_mlip import load_predict_unit
     from fairchem.core.calculate.ase_calculator import FAIRChemCalculator
-    predictor = get_predict_unit(predict_unit, device=device)
+    from omegaconf import OmegaConf
+    if model[-3:] != ".pt":
+        model = f"{model}.pt"
+    model_path = os.path.join(cache_dir, "checkpoints", model)
+    atom_refs_path = os.path.join(cache_dir, "references", "iso_atom_elem_refs.yaml")
+    atom_refs = OmegaConf.load(atom_refs_path)
+    predictor = load_predict_unit(model_path, inference_settings="default", device=device, atom_refs=atom_refs)
     return FAIRChemCalculator(predictor, task_name=task_name)
 
 def get_aimnet_calc(base_calc="aimnet2"):

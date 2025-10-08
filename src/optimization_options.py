@@ -23,7 +23,7 @@ class OptimizationConfiguration:
 @dataclass
 class BaseConfiguration:
     method: str
+    options: Union[Dict, OptimizationConfiguration]
     atoms: str
     coordinates: str
     output_dir: str
-    options: Union[Dict, OptimizationConfiguration]

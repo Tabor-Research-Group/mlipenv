@@ -10,7 +10,7 @@ def configuration_builder(method, atoms, coordinates, output_dir=".", **kwargs):
         options = build_energy_config(**kwargs)
     else:
         raise NotImplementedError
-    return asdict(BaseConfiguration(method, atoms, coordinates, output_dir, options))
+    return asdict(BaseConfiguration(method, options, atoms, coordinates, output_dir))
 
 def build_optimization_config(optimizer, charge=0, spin=1, **kwargs):
     optimizer = optimizer.lower()
