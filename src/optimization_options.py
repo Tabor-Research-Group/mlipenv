@@ -4,26 +4,26 @@ from typing import List, Union, Dict, Tuple
 from src.enums.output_enum import _output_file_registry
 
 @dataclass
-class OptimizerConfiguration:
+class OptimizationConfiguration:
+    optimizer: str
     logging: str = ""
     output: Union[str, Tuple[str]] = tuple(_output_file_registry().keys())
 
 @dataclass
-class ASEOptimizerConfiguration(OptimizerConfiguration):
+class ASEOptimizationConfiguration(OptimizationConfiguration):
     fmax: float = 0.02
     steps: int = 5
 
 @dataclass
-class OptimizationConfiguration:
-    optimizer: str
-    options: Union[Dict, OptimizerConfiguration]
-    charge: Union[float, List[float]]
-    spin: float
+class EnergyConfiguration:
+    order: int = 1
 
 @dataclass
 class BaseConfiguration:
     method: str
-    options: Union[Dict, OptimizationConfiguration]
+    options: Union[Dict, OptimizationConfiguration, EnergyConfiguration]
     atoms: str
     coordinates: str
+    charge: Union[float, List[float]]
+    spin: float
     output_dir: str

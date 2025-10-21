@@ -10,6 +10,8 @@ class BaseManager:
     def __init__(self, config):
         self.atoms = self.load_atoms(config.atoms)
         self.coordinates = self.load_coordinates(config.coordinates)
+        self.charge = config.charge
+        self.spin = config.spin
         self.output_dir = config.output_dir
 
     def _load_parameter(self, parameter_bundle):
@@ -67,11 +69,11 @@ class OptimizationManager(BaseManager):
     def get_optimization_scheme(self):
         requested_optimizer = self.config.optimizer.lower()
         if requested_optimizer == "ase":
-            return ASEOptimizationRunner(self.atoms, self.coordinates, self.config)
+            return ASEOptimizationRunner(**self.__dict__)
         elif requested_optimizer == "scipy":
-            return SciPyOptimizationRunner(self.atoms, self.coordinates, self.config)
+            return SciPyOptimizationRunner(**self.__dict__)
         elif "mark" in requested_optimizer:
-            return MarksOptimizationRunner(self.atoms, self.coordinates, self.config)
+            return MarksOptimizationRunner(**self.__dict__)
         else:
             raise NotImplementedError(f"Unknown optimizer: {requested_optimizer}")
     
