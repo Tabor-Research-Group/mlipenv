@@ -1,0 +1,16 @@
+{
+    "method": "optimize",
+    "options":
+    {
+        "optimizer": "ase",
+	"logging": "",
+        "output": ["atoms", "coordinates", "gradients", "energies"],
+        "fmax": 0.02,
+        "steps": 500
+    },
+    "atoms": "test/atoms.npz",
+    "coordinates": "test/coordinates.npz",
+    "charge": 0,
+    "spin": 1,
+    "output_dir": "."
+}

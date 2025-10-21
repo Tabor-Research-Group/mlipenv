@@ -2,3 +2,4 @@ __pycache__
 /*.npz
 *.egg-info
 /build
+.ipynb_checkpoints

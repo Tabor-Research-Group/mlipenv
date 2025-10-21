@@ -8,5 +8,5 @@
     "coordinates": "test/coordinates.npz",
     "charge": 0,
     "spin": 1,
-    "output_dir": "./"
+    "output_dir": "."
 }
