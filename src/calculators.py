@@ -1,5 +1,7 @@
 import os
 
+from src.util import find_file
+
 def get_calc(**kwargs):
     calculator = os.environ["CALCULATOR"].lower()
     if calculator == "fairchem":
@@ -25,10 +27,9 @@ def get_fairchem_calc(model="uma-s-1p1", task_name="omol", device="cpu"):
     from fairchem.core.calculate.pretrained_mlip import load_predict_unit
     from fairchem.core.calculate.ase_calculator import FAIRChemCalculator
     from omegaconf import OmegaConf
-    if model[-3:] != ".pt":
-        model = f"{model}.pt"
-    model_path = os.path.join(cache_dir, "checkpoints", model)
-    atom_refs_path = os.path.join(cache_dir, "references", "iso_atom_elem_refs.yaml")
+    model_file = f"{model}.pt" if model[-3:] != ".pt" else model
+    model_path = find_file(cache_dir, model_file)
+    atom_refs_path = find_file(cache_dir, "iso_atom_elem_refs.yaml")
     atom_refs = OmegaConf.load(atom_refs_path)
     predictor = load_predict_unit(model_path, inference_settings="default", device=device, atom_refs=atom_refs)
     return FAIRChemCalculator(predictor, task_name=task_name)

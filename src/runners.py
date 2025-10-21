@@ -5,11 +5,11 @@ import numpy as np
 from ase import Atoms
 
 from src.calculators import get_calc
-from src.optimization_options import ASEOptimizerConfiguration
+from src.optimization_options import ASEOptimizationConfiguration, EnergyConfiguration
 from src.enums.output_enum import _output_file_registry
 
 class BaseRunner:
-    def __init__(self, atoms, coordinates, charge, spin **kwargs):
+    def __init__(self, atoms, coordinates, charge, spin, **kwargs):
         self.atoms = atoms
         self.coordinates = coordinates
         self.charge = charge
@@ -28,6 +28,14 @@ class BaseRunner:
         output_paths = self.get_output_with_defaults(output_dir)
         for loc, res in zip(output_paths, formatted_results):
             np.savez(loc, *res)
+
+    def atomize(self, atom_symbols, coordinates, charge):
+        atoms = Atoms(symbols=atom_symbols, positions=coordinates)
+        atoms.info["charge"] = charge
+        atoms.info["spin"] = self.spin
+        calc = get_calc()
+        atoms.calc = calc
+        return atoms
     
     def format_results(self):
         return [[f(obj) for obj in self.results] for f in self.result_getters()]
@@ -51,10 +59,10 @@ class EnergyRunner(BaseRunner):
 
     def load_config_with_defaults(self, config):
         super().load_config_with_defaults(config)
-        self.options = EnergyConfiguration(**config.options)
+        self.options = EnergyConfiguration(**config)
     
-    def result_getters():
-        getters = self.get_single_point_energy
+    def result_getters(self):
+        getters = [self.get_single_point_energy]
         if self.options.order > 0:
             getters.append(self.get_gradients)
         return getters
@@ -67,11 +75,13 @@ class EnergyRunner(BaseRunner):
         return [os.path.join(output_dir, file) for file in output_files]
     
     def run(self):
-        return
+        self.results = [self.atomize(atoms, coords, charge) 
+                           for atoms, coords, charge in zip(self.atoms, self.coordinates, self.charge)]
 
     def get_gradients(self, obj):
         return np.array(obj.calc.get_forces())
     def get_single_point_energy(self, obj):
+        print(obj)
         return np.array(obj.calc.get_potential_energy())
 
 class BaseOptimizationRunner(BaseRunner):
@@ -107,7 +117,7 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
 
     def load_config_with_defaults(self, config):
         super().load_config_with_defaults(config)
-        self.options = ASEOptimizationConfiguration(**config.options)
+        self.options = ASEOptimizationConfiguration(**config)
     
     def run(self):
         optimized_atoms = [self.run_opt(atoms, coords, charge) 
@@ -124,11 +134,7 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
         return np.array(obj.calc.get_potential_energy())
 
     def run_opt(self, atom_symbols, coordinates, charge):
-        atoms = Atoms(symbols=atom_symbols, positions=coordinates)
-        atoms.info["charge"] = charge
-        atoms.info["spin"] = self.spin
-        calc = get_calc()
-        atoms.calc = calc
+        atoms = self.atomize(atom_symbols, coordinates, charge)
         atoms = self._run_opt(atoms)
         return atoms
     

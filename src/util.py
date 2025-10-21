@@ -1,3 +1,4 @@
+import os
 from dataclasses import asdict
 
 from src.optimization_options import *
@@ -36,3 +37,10 @@ def build_optimization_config(optimizer, **kwargs):
 
 def build_energy_config(**kwargs):
     ...
+
+
+def find_file(root, target):
+    for dirpath, dirs, files in os.walk(root):
+        if target in files:
+            return os.path.join(dirpath, target)
+    return None

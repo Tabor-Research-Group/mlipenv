@@ -3,7 +3,7 @@ import abc
 
 import numpy as np
 
-from src.runners import ASEOptimizationRunner, SciPyOptimizationRunner, MarksOptimizationRunner
+from src.runners import ASEOptimizationRunner, SciPyOptimizationRunner, MarksOptimizationRunner, EnergyRunner
 from src.optimization_options import OptimizationConfiguration
 
 class BaseManager:
@@ -54,20 +54,26 @@ class BaseManager:
 class EnergyManager(BaseManager):
     def __init__(self, config):
         super().__init__(config)
-    
+        self.config = config.options
+
     def run(self):
         self.compute_energy()
     
     def compute_energy(self):
-        ...
+        energy_runner = EnergyRunner(**self.__dict__)
+        energy_runner.run()
+        energy_runner.export_results(self.output_dir)
+
 
 class OptimizationManager(BaseManager):
     def __init__(self, config):
         super().__init__(config)
-        self.config = OptimizationConfiguration(**config.options)
+        self.config = config.options
 
     def get_optimization_scheme(self):
-        requested_optimizer = self.config.optimizer.lower()
+        if "optimizer" not in self.config:
+            raise ValueError(f"'optimizer' is a required entry in the 'options' dictionary")
+        requested_optimizer = self.config["optimizer"]
         if requested_optimizer == "ase":
             return ASEOptimizationRunner(**self.__dict__)
         elif requested_optimizer == "scipy":
