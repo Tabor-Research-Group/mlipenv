@@ -79,10 +79,9 @@ class EnergyRunner(BaseRunner):
                            for atoms, coords, charge in zip(self.atoms, self.coordinates, self.charge)]
 
     def get_gradients(self, obj):
-        return np.array(obj.calc.get_forces())
+        return np.array(obj.get_forces())
     def get_single_point_energy(self, obj):
-        print(obj)
-        return np.array(obj.calc.get_potential_energy())
+        return np.array(obj.get_potential_energy())
 
 class BaseOptimizationRunner(BaseRunner):
     def __init__(self, **kwargs):
@@ -129,9 +128,9 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
     def get_coordinates(self, obj):
         return np.array(obj.get_positions())
     def get_gradients(self, obj):
-        return np.array(obj.calc.get_forces())
+        return np.array(obj.get_forces())
     def get_single_point_energy(self, obj):
-        return np.array(obj.calc.get_potential_energy())
+        return np.array(obj.get_potential_energy())
 
     def run_opt(self, atom_symbols, coordinates, charge):
         atoms = self.atomize(atom_symbols, coordinates, charge)
