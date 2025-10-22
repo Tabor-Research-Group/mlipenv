@@ -16,9 +16,7 @@ class BaseManager:
         self.output_dir = config.output_dir
 
     def _load_parameter(self, parameter_bundle):
-        print(parameter_bundle, type(parameter_bundle))
         if isinstance(parameter_bundle, str):
-            print(f"path exists = {os.path.exists(parameter_bundle)}")
             if os.path.exists(parameter_bundle):
                 data = np.load(parameter_bundle)
                 if len(data.files) > 1:
@@ -27,7 +25,7 @@ class BaseManager:
                     parameter = data[data.files[0]]
                     # runners enforce one-at-a-time batching, if the input
                     # is a multi-dim np array, we splice it up here.
-                    if parameter.ndim > 1:
+                    if parameter.ndim > 2:
                         parameter = [parameter[i] for i in parameter.shape[0]]
                     else:
                         parameter = [parameter]
