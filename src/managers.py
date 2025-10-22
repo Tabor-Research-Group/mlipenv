@@ -2,6 +2,7 @@ import os
 import abc
 
 import numpy as np
+import traceback
 
 from src.runners import ASEOptimizationRunner, SciPyOptimizationRunner, MarksOptimizationRunner, EnergyRunner
 from src.optimization_options import OptimizationConfiguration
@@ -36,14 +37,16 @@ class BaseManager:
         try:
             coordinates = self._load_parameter(coordinates_bundle)
         except Exception as e:
-            raise NotImplementedError(f"Could not load coordinates from: {coordinates_bundle}") from e
+            traceback.print_exc()
+            raise NotImplementedError(f"Could not load coordinates from: {coordinates_bundle}")
         return coordinates
     
     def load_atoms(self, atoms_bundle):
         try:
             atoms = self._load_parameter(atoms_bundle)
         except Exception as e:
-            raise NotImplementedError(f"Could not load atoms from: {atoms_bundle}") from e
+            traceback.print_exc()
+            raise NotImplementedError(f"Could not load atoms from: {atoms_bundle}")
         return atoms
         
     @abc.abstractmethod
