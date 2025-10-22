@@ -16,7 +16,9 @@ class BaseManager:
         self.output_dir = config.output_dir
 
     def _load_parameter(self, parameter_bundle):
+        print(parameter_bundle, type(parameter_bundle))
         if isinstance(parameter_bundle, str):
+            print(f"path exists = {os.path.exists(parameter_bundle)}")
             if os.path.exists(parameter_bundle):
                 data = np.load(parameter_bundle)
                 if len(data.files) > 1:
