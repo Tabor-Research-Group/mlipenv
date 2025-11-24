@@ -110,10 +110,10 @@ class BaseOptimizationRunner(BaseRunner):
 
 
 class ASEOptimizationRunner(BaseOptimizationRunner):
-    def __init__(self, config, **kwargs):
+    def __init__(self, config, output_dir, **kwargs):
         super().__init__(**kwargs)
+        self.output_dir = output_dir
         self.run_count = 0
-        self.output_dir = config.output_dir
         self.load_config_with_defaults(config)
 
     def load_config_with_defaults(self, config):
