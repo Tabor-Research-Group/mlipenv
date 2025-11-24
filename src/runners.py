@@ -112,6 +112,8 @@ class BaseOptimizationRunner(BaseRunner):
 class ASEOptimizationRunner(BaseOptimizationRunner):
     def __init__(self, config, **kwargs):
         super().__init__(**kwargs)
+        self.run_count = 0
+        self.output_dir = config.output_dir
         self.load_config_with_defaults(config)
 
     def load_config_with_defaults(self, config):
@@ -139,8 +141,10 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
     
     def _run_opt(self, atoms):
         from ase.optimize import BFGS
-        opt = BFGS(atoms)
+        os.makedirs(os.path.join(self.output_dir, "trajectories"), exist_ok=True)
+        opt = BFGS(atoms, trajectory=os.path.join(self.output_dir, "trajectories", f"{self.run_count}.traj"))
         opt.run(fmax=self.options.fmax, steps=self.options.steps)
+        self.run_count = self.run_count + 1
         return atoms
 
 
