@@ -4,7 +4,7 @@ import abc
 import numpy as np
 import traceback
 
-from src.runners import ASEOptimizationRunner, SciPyOptimizationRunner, MarksOptimizationRunner, EnergyRunner
+from src.runners import ASEOptimizationRunner, SciPyOptimizationRunner, BetterOptimizationRunner, EnergyRunner
 from src.optimization_options import OptimizationConfiguration
 
 class BaseManager:
@@ -81,8 +81,8 @@ class OptimizationManager(BaseManager):
             return ASEOptimizationRunner(**self.__dict__)
         elif requested_optimizer == "scipy":
             return SciPyOptimizationRunner(**self.__dict__)
-        elif "mark" in requested_optimizer:
-            return MarksOptimizationRunner(**self.__dict__)
+        elif "better" in requested_optimizer:
+            return BetterOptimizationRunner(**self.__dict__)
         else:
             raise NotImplementedError(f"Unknown optimizer: {requested_optimizer}")
     

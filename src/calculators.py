@@ -15,7 +15,8 @@ def get_calc(**kwargs):
 
 MODEL_CACHE_DIR = "MODEL_CACHE_DIR"
 DEFAULT_CACHE_DIR = "DEFAULT_MODEL_CACHE_DIR"
-def get_fairchem_calc(model="uma-s-1p1", task_name="omol", device="cpu"):
+
+def get_fairchem_predict_unit(model="uma-s-1p1", device="cpu"):
     cache_locs = []
     if MODEL_CACHE_DIR in os.environ:
         cache_locs.append(os.environ[MODEL_CACHE_DIR])
@@ -25,7 +26,6 @@ def get_fairchem_calc(model="uma-s-1p1", task_name="omol", device="cpu"):
         raise ValueError(f"either `{MODEL_CACHE_DIR}` or `{DEFAULT_CACHE_DIR}` must be set at the environment level")
 
     from fairchem.core.calculate.pretrained_mlip import load_predict_unit
-    from fairchem.core.calculate.ase_calculator import FAIRChemCalculator
     from omegaconf import OmegaConf
     for cache_dir in cache_locs:
         try:
@@ -33,12 +33,17 @@ def get_fairchem_calc(model="uma-s-1p1", task_name="omol", device="cpu"):
             model_path = find_file(cache_dir, model_file)
             atom_refs_path = find_file(cache_dir, "iso_atom_elem_refs.yaml")
             atom_refs = OmegaConf.load(atom_refs_path)
-            predictor = load_predict_unit(model_path, inference_settings="default", device=device, atom_refs=atom_refs)
-            return FAIRChemCalculator(predictor, task_name=task_name)
+            return load_predict_unit(model_path, inference_settings="default", device=device, atom_refs=atom_refs)
         except:
             pass
-    raise ValueError(f"could not load model files. you should check on `{MODEL_CACHE_DIR}` and/or `{DEFAULT_CACHE_DIR}`")
-            
+
+def get_fairchem_calc(model="uma-s-1p1", task_name="omol", device="cpu"):
+    from fairchem.core.calculate.ase_calculator import FAIRChemCalculator
+    try:
+        predictor = get_fairchem_predict_unit(model, device)
+        return FAIRChemCalculator(predictor, task_name=task_name)
+    except:
+        raise ValueError(f"could not load model files. you should check on `{MODEL_CACHE_DIR}` and/or `{DEFAULT_CACHE_DIR}`")
 
 def get_aimnet_calc(base_calc="aimnet2"):
     from aimnet2calc import AIMNet2ASE

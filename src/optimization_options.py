@@ -6,7 +6,6 @@ from src.enums.output_enum import _output_file_registry
 @dataclass
 class OptimizationConfiguration:
     optimizer: str
-    logging: str = ""
     output: Union[str, Tuple[str]] = tuple(_output_file_registry().keys())
 
 @dataclass

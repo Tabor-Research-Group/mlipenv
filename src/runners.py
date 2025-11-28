@@ -7,6 +7,7 @@ from ase import Atoms
 from src.calculators import get_calc
 from src.optimization_options import ASEOptimizationConfiguration, EnergyConfiguration
 from src.enums.output_enum import _output_file_registry
+from src.optimizers import BetterBFGS
 
 class BaseRunner:
     def __init__(self, atoms, coordinates, charge, spin, **kwargs):
@@ -22,8 +23,7 @@ class BaseRunner:
             self.atoms = self.atoms[:-1] + [self.atoms[-1]] * (len(self.coordinates) - len(self.atoms) + 1)
     
     def export_results(self, output_dir):
-        # not explicitly enforcing alignment here. relying on default ordering given by
-        # self.result_getters and src.enums.output_enum._output_file_registry
+        self.export_results_subroutine(output_dir)
         formatted_results = self.format_results()
         output_paths = self.get_output_with_defaults(output_dir)
         for loc, res in zip(output_paths, formatted_results):
@@ -39,6 +39,9 @@ class BaseRunner:
     
     def format_results(self):
         return [[f(obj) for obj in self.results] for f in self.result_getters()]
+
+    def export_results_subroutine(self, *args):
+        pass
 
     @abc.abstractmethod
     def result_getters():
@@ -106,7 +109,6 @@ class BaseOptimizationRunner(BaseRunner):
     @abc.abstractmethod
     def get_single_point_energy(self, obj):
         ...
-    # option to write .trj and .log files to a specified place
 
 
 class ASEOptimizationRunner(BaseOptimizationRunner):
@@ -142,7 +144,12 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
     def _run_opt(self, atoms):
         from ase.optimize import BFGS
         os.makedirs(os.path.join(self.output_dir, "trajectories"), exist_ok=True)
-        opt = BFGS(atoms, trajectory=os.path.join(self.output_dir, "trajectories", f"{self.run_count}.traj"))
+        os.makedirs(os.path.join(self.output_dir, "logs"), exist_ok=True)
+        opt = BFGS(
+            atoms, 
+            trajectory=os.path.join(self.output_dir, "trajectories", f"{self.run_count}.traj"),
+            logfile=os.path.join(self.output_dir, "logs", f"{self.run_count}.log")
+            )
         opt.run(fmax=self.options.fmax, steps=self.options.steps)
         self.run_count = self.run_count + 1
         return atoms
@@ -156,9 +163,64 @@ class SciPyOptimizationRunner(BaseOptimizationRunner):
         ...
 
 
-class MarksOptimizationRunner(BaseOptimizationRunner):
+class BetterOptimizationRunner(ASEOptimizationRunner):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
     
     def run(self):
-        ...
+        import torch
+        if not os.environ["CALCULATOR"].lower() == "fairchem":
+            raise NotImplementedError(f"BetterOptimizationRunner is not currently written for {os.environ["CALCULATOR"]} calculator.")
+        from src.calculators import get_fairchem_predict_unit
+        from fairchem.core.datasets.atomic_data import AtomicData, atomicdata_list_to_batch
+        predictor = get_fairchem_predict_unit()
+        optimizers = [BetterBFGS(atoms, coords, charge, idx)
+                      for idx, (atoms, coords, charge) in enumerate(zip(self.atoms, self.coordinates, self.charge))]
+        for i in range(self.options.steps):
+            print(f"step {i}")
+            # if oom is ever encountered, schedule this with a dataloader
+            atomic_data = [AtomicData.from_ase(optimizer.ase_atoms, task_name="omol")
+                           for optimizer in optimizers if not optimizer.converged]
+            batch = atomicdata_list_to_batch(atomic_data)
+            with torch.no_grad():
+                preds = predictor.predict(batch)
+            for j, optimizer in enumerate(optimizers):
+                if not optimizer.converged:
+                    optimizer.remember_energy(preds["energy"][j])
+                    optimizer.optimize_and_update(preds["forces"][batch.batch == j], self.options.fmax)
+        self.results = optimizers
+
+    def get_atom_symbols(self, obj):
+        return np.array(obj.get_atoms())
+    def get_coordinates(self, obj):
+        return np.array(obj.get_coordinates())
+    def get_gradients(self, obj):
+        return np.array(obj.get_forces())
+    def get_single_point_energy(self, obj):
+        return np.array(obj.get_energy())
+    
+    def export_results_subroutine(self, output_dir):
+        os.makedirs(os.path.join(output_dir, "trajectories"), exist_ok=True)
+        os.makedirs(os.path.join(output_dir, "logs"), exist_ok=True)
+        for optimizer in self.results:
+            optimizer.write_trajectory(output_dir)
+            optimizer.write_log(output_dir)
+    
+
+    # def run_opt(self, atom_symbols, coordinates, charge):
+    #     atoms = self.atomize(atom_symbols, coordinates, charge)
+    #     atoms = self._run_opt(atoms)
+    #     return atoms
+    
+    # def _run_opt(self, atoms):
+    #     from ase.optimize import BFGS
+    #     os.makedirs(os.path.join(self.output_dir, "trajectories"), exist_ok=True)
+    #     os.makedirs(os.path.join(self.output_dir, "logs"), exist_ok=True)
+    #     opt = BFGS(
+    #         atoms, 
+    #         trajectory=os.path.join(self.output_dir, "trajectories", f"{self.run_count}.traj"),
+    #         logfile=os.path.join(self.output_dir, "logs", f"{self.run_count}.log")
+    #         )
+    #     opt.run(fmax=self.options.fmax, steps=self.options.steps)
+    #     self.run_count = self.run_count + 1
+    #     return atoms
