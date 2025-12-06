@@ -10,6 +10,9 @@ from src.enums.output_enum import _output_file_registry
 from src.optimizers import BetterBFGS
 
 class BaseRunner:
+
+    debug = os.environ.get("DEBUG")
+
     def __init__(self, atoms, coordinates, charge, spin, **kwargs):
         self.atoms = atoms
         self.coordinates = coordinates
@@ -181,7 +184,7 @@ class BetterOptimizationRunner(ASEOptimizationRunner):
         bfgs_times = []
         for i in range(self.options.steps):
             unconverged_optimizers = [optimizer for optimizer in optimizers if not optimizer.converged]
-            if os.environ.get("DEBUG").lower() == "true":
+            if self.debug and self.debug.lower() == "true":
                 print(f"step {i}")
                 print(f"num unconverged = {len(unconverged_optimizers)}")
             atomic_data = [AtomicData.from_ase(optimizer.ase_atoms, task_name="omol")
@@ -196,7 +199,7 @@ class BetterOptimizationRunner(ASEOptimizationRunner):
                 optimizer.remember_energy(preds["energy"][j])
                 optimizer.optimize_and_update(preds["forces"][batch.batch == j], self.options.fmax)
             bfgs_times.append(time.time()-t2)
-        if os.environ.get("DEBUG").lower() == "true":
+        if self.debug and self.debug.lower() == "true":
             print(f"torch times = {torch_times}")
             print(f"bfgs times = {bfgs_times}")
         self.results = optimizers
