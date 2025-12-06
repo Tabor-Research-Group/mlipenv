@@ -28,11 +28,9 @@ def configuration_builder(method,
 def build_optimization_config(optimizer, **kwargs):
     optimizer = optimizer.lower()
     if optimizer == "ase":
-        config = ASEOptimizationConfiguration(optimizer, **kwargs)
-    elif optimizer == "scipy":
-        ...
-    elif "mark" in optimizer:
-        ...
+        config = OptimizationConfiguration(optimizer, **kwargs)
+    elif "better" in optimizer:
+        config = OptimizationConfiguration(optimizer, **kwargs)
     return config
 
 def build_energy_config(**kwargs):

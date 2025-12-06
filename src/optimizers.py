@@ -53,13 +53,11 @@ class BetterBFGS:
 
     def compute_steps(self):
         l, Q = np.linalg.eig(self.prev_hessian)
-        print(Q.shape, self.forces_history[-1].shape)
         steps = Q @ (( Q.T @ self.forces_history[-1].flatten()) / l)
         return np.reshape(steps, self.coordinates_history[-1].shape)
     
     def optimize_and_update(self, predicted_forces, fmax):
         self.forces_history.append(np.asanyarray(predicted_forces))
-        print(np.max(self.forces_history[-1]))
         if np.max(self.forces_history[-1]) < fmax:
             self.converged = True
             return

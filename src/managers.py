@@ -5,7 +5,6 @@ import numpy as np
 import traceback
 
 from src.runners import ASEOptimizationRunner, SciPyOptimizationRunner, BetterOptimizationRunner, EnergyRunner
-from src.optimization_options import OptimizationConfiguration
 
 class BaseManager:
     def __init__(self, config):

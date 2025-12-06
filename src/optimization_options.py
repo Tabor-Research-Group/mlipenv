@@ -7,9 +7,6 @@ from src.enums.output_enum import _output_file_registry
 class OptimizationConfiguration:
     optimizer: str
     output: Union[str, Tuple[str]] = tuple(_output_file_registry().keys())
-
-@dataclass
-class ASEOptimizationConfiguration(OptimizationConfiguration):
     fmax: float = 0.02
     steps: int = 5
 
