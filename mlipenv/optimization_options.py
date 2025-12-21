@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Union, Dict, Tuple
 
-from src.enums.output_enum import _output_file_registry
+from mlipenv.enums.output_enum import _output_file_registry
 
 @dataclass
 class OptimizationConfiguration:
@@ -14,6 +14,8 @@ class OptimizationConfiguration:
 class EnergyConfiguration:
     order: int = 1
 
+
+structure_path_keys = ["structure_path", "xyz_path"]
 @dataclass
 class BaseConfiguration:
     method: str
@@ -23,3 +25,4 @@ class BaseConfiguration:
     charge: Union[float, List[float]]
     spin: float
     output_dir: str
+

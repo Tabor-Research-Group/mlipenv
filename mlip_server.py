@@ -1,5 +1,5 @@
 from io import StringIO
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, redirect_stderr
 import traceback
 
 from servers.node_comm import *
@@ -14,7 +14,7 @@ class MLIPHandler(NodeCommHandler):
         }
     
     def evaluate(self, args):
-        from src.mlip_opt import call_to_mlip_server
+        from mlipenv.mlip_opt import call_to_mlip_server
         if not len(args):
             response = {
                 "stdout": "",
@@ -23,7 +23,7 @@ class MLIPHandler(NodeCommHandler):
         else:
             try:
                 buffer = StringIO()
-                with redirect_stdout(buffer):
+                with redirect_stdout(buffer), redirect_stderr(buffer):
                     call_to_mlip_server(*args)
                 response = {
                     "stdout": buffer.getvalue(),

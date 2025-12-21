@@ -1,10 +1,13 @@
 import os
 import abc
+import traceback
+import logging
 
 import numpy as np
-import traceback
 
-from src.runners import ASEOptimizationRunner, SciPyOptimizationRunner, BetterOptimizationRunner, EnergyRunner
+from mlipenv.runners import ASEOptimizationRunner, SciPyOptimizationRunner, BetterOptimizationRunner, EnergyRunner
+
+logger = logging.getLogger(__name__)
 
 class BaseManager:
     def __init__(self, config):
@@ -74,14 +77,15 @@ class OptimizationManager(BaseManager):
 
     def get_optimization_scheme(self):
         if "optimizer" not in self.config:
-            raise ValueError(f"'optimizer' is a required entry in the 'options' dictionary")
-        requested_optimizer = self.config["optimizer"]
-        if requested_optimizer == "ase":
-            return ASEOptimizationRunner(**self.__dict__)
-        elif requested_optimizer == "scipy":
-            return SciPyOptimizationRunner(**self.__dict__)
-        elif "better" in requested_optimizer:
+            logger.warning("'optimizer' was not included in the 'options' dictionary. using default optimizer.")
             return BetterOptimizationRunner(**self.__dict__)
+        requested_optimizer = self.config["optimizer"]
+        if "better" in requested_optimizer or "default" in requested_optimizer:
+            return BetterOptimizationRunner(**self.__dict__)
+        elif requested_optimizer == "ase":
+            return ASEOptimizationRunner(**self.__dict__)
+        # elif requested_optimizer == "scipy":
+        #     return SciPyOptimizationRunner(**self.__dict__)
         else:
             raise NotImplementedError(f"Unknown optimizer: {requested_optimizer}")
     

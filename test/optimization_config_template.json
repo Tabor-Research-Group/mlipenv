@@ -2,8 +2,7 @@
     "method": "optimize",
     "options":
     {
-        "optimizer": "ase",
-	"logging": "",
+        "optimizer": "better",
         "output": ["atoms", "coordinates", "gradients", "energies"],
         "fmax": 0.02,
         "steps": 500

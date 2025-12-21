@@ -1,13 +1,16 @@
 import os
 import abc
+import logging
 
 import numpy as np
 from ase import Atoms
 
-from src.calculators import get_calc
-from src.optimization_options import OptimizationConfiguration, EnergyConfiguration
-from src.enums.output_enum import _output_file_registry
-from src.optimizers import BetterBFGS
+from mlipenv.calculators import get_calc
+from mlipenv.optimization_options import OptimizationConfiguration, EnergyConfiguration
+from mlipenv.enums.output_enum import _output_file_registry
+from mlipenv.optimizers import BetterBFGS
+
+logger = logging.getLogger(__name__)
 
 class BaseRunner:
 
@@ -23,7 +26,9 @@ class BaseRunner:
         if isinstance(self.charge, int):
             self.charge = [self.charge] * len(self.coordinates)
         if len(self.atoms) < len(self.coordinates):
-            self.atoms = self.atoms[:-1] + [self.atoms[-1]] * (len(self.coordinates) - len(self.atoms) + 1)
+            self.atoms = self.atoms + [self.atoms[-1]] * (len(self.coordinates) - len(self.atoms))
+        if len(self.charge) < len(self.coordinates):
+            self.charge = self.charge + [self.charge[-1]] * (len(self.coordinates) - len(self.charge))
     
     def export_results(self, output_dir):
         self.export_results_subroutine(output_dir)
@@ -175,7 +180,7 @@ class BetterOptimizationRunner(ASEOptimizationRunner):
         import time
         if not os.environ["CALCULATOR"].lower() == "fairchem":
             raise NotImplementedError(f"BetterOptimizationRunner is not currently written for {os.environ["CALCULATOR"]} calculator.")
-        from src.calculators import get_fairchem_predict_unit
+        from mlipenv.calculators import get_fairchem_predict_unit
         from fairchem.core.datasets.atomic_data import AtomicData, atomicdata_list_to_batch
         predictor = get_fairchem_predict_unit()
         optimizers = [BetterBFGS(atoms, coords, charge, idx)
@@ -183,7 +188,10 @@ class BetterOptimizationRunner(ASEOptimizationRunner):
         torch_times = []
         bfgs_times = []
         for i in range(self.options.steps):
+            logger.info(f"optimization step: {i}")
             unconverged_optimizers = [optimizer for optimizer in optimizers if not optimizer.converged]
+            if not len(unconverged_optimizers):
+                break
             if self.debug and self.debug.lower() == "true":
                 print(f"step {i}")
                 print(f"num unconverged = {len(unconverged_optimizers)}")

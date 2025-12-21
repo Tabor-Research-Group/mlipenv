@@ -1,6 +1,6 @@
 import os
 
-from src.util import find_file
+from mlipenv.util import find_file
 
 def get_calc(**kwargs):
     calculator = os.environ["CALCULATOR"].lower()

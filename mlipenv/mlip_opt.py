@@ -1,28 +1,16 @@
 import os
 import json
+import logging
 
-from src.managers import OptimizationManager, EnergyManager
-from src.optimization_options import BaseConfiguration
+from mlipenv.managers import OptimizationManager, EnergyManager
+from mlipenv.optimization_options import BaseConfiguration, structure_path_keys
 
-# config:
-#   method: { type: , options: {}}
-#   atoms
-#   coordinates
-
-# method: { 
-#   type: optimize, 
-#   options: {
-#       optimizer: {
-#           type:
-#           options: {}
-#           }
-#       }
-
-# method: { 
-#   type: energy, 
-#   options: {
-#       order:
-#       }
+def configure_logger():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    logging.getLogger(__name__).info("logger configured")
 
 def load_config(config_bundle):
     if isinstance(config_bundle, str):
@@ -39,8 +27,16 @@ def load_config(config_bundle):
         config = config_bundle
     else:
         raise NotImplementedError(f"Intractable input type: {type(config_bundle)}")
+    found_structure_path_key = next((s for s in structure_path_keys if s in config), None)
+    if found_structure_path_key:
+        from mlipenv.util import convert_to_nparr
+        atoms, coordinates = convert_to_nparr(config[found_structure_path_key])
+        # I give up. these keys are hard-coded.
+        config["atoms"] = atoms
+        config["coordinates"] = coordinates
+        config.pop(found_structure_path_key, None)
     return BaseConfiguration(**config)
-
+    
 def get_runner_for_method(config):
     if config.method == "optimize":
         return OptimizationManager(config)
@@ -50,6 +46,7 @@ def get_runner_for_method(config):
         raise NotImplementedError(f"Unknown method type: {config.method}")
 
 def call_to_mlip_server(config_bundle):
+    configure_logger()
     config = load_config(config_bundle)
     runner = get_runner_for_method(config)
     runner.run()

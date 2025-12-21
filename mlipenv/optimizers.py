@@ -10,7 +10,7 @@ class BetterBFGS:
         self.index = index
         self.ase_atoms = Atoms(atoms, coordinates)
         self.ase_atoms.info.update({"charge": charge})
-        self.coordinates_history = [coordinates]
+        self.coordinates_history = [np.asarray(coordinates, dtype=np.float64)]
         self.forces_history = []
         self.prev_hessian = None
         self.energy_history = []
