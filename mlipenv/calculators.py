@@ -85,10 +85,19 @@ def get_aimnet_calc(model_path, **kwargs):
 MACE_DEFAULT_MODEL_PATH="/home/models/MACE-omol-0-extra-large-1024.model"
 def get_mace_calc(model_path, calculator, device, **kwargs):
     import mace.calculators
+    calculator = calculator.lower()
+    if calculator == "omol":
+        calculator = "mace_omol"
+    elif calculator == "off":
+        calculator = "mace_off"
+    elif calculator == "mp":
+        calculator = "mace_mp"
+    elif calculator == "anicc":
+        calculator = "mace_anicc"
     calc_cls = getattr(mace.calculators, calculator)
     if model_path:
         try:
-            calc_cls(model=model_path, device=device)
+            return calc_cls(model=model_path, device=device)
         except:
             logger.warning(f"could not load the model from path {model_path}. proceeding with default.")
     model_path = MACE_DEFAULT_MODEL_PATH

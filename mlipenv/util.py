@@ -13,6 +13,9 @@ def configuration_builder(method,
                           charge, 
                           spin, 
                           output_dir=".", 
+                          device=None,
+                          model_path=None,
+                          mace_calculator=None,
                           **kwargs):
     if method == "optimize":
         options = build_optimization_config(**kwargs)
@@ -20,13 +23,20 @@ def configuration_builder(method,
         options = build_energy_config(**kwargs)
     else:
         raise NotImplementedError
+    if mace_calculator is not None:
+        calculator_options = MACECalculatorConfiguration(device, model_path, mace_calculator)
+    elif model_path is not None:
+        calculator_options = AIMNetCalculatorConfiguration(device, model_path)
+    else:
+        calculator_options = CalculatorConfiguration(device)
     return asdict(BaseConfiguration(method, 
                                     options, 
                                     atoms, 
                                     coordinates, 
                                     charge, 
                                     spin, 
-                                    output_dir))
+                                    output_dir, 
+                                    calculator_options))
 
 def build_optimization_config(optimizer, **kwargs):
     optimizer = optimizer.lower()

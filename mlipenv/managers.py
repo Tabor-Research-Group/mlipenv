@@ -92,5 +92,7 @@ class OptimizationManager(BaseManager):
     
     def run(self):
         optimization_runner = self.get_optimization_scheme()
+        logger.info("starting optimization...")
         optimization_runner.run()
+        logger.info("completed optimization, exporting results...")
         optimization_runner.export_results(self.output_dir)
