@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 from ase import Atoms
+import torch
 
 class BetterBFGS:
 
@@ -17,6 +18,8 @@ class BetterBFGS:
         self.converged = False
 
     def remember_energy(self, energy):
+        if isinstance(energy, torch.Tensor):
+            energy = energy.detach().cpu().numpy()
         self.energy_history.append(energy)
 
     def get_atoms(self):
@@ -57,7 +60,10 @@ class BetterBFGS:
         return np.reshape(steps, self.coordinates_history[-1].shape)
     
     def optimize_and_update(self, predicted_forces, fmax):
-        self.forces_history.append(np.asanyarray(predicted_forces))
+        if isinstance(predicted_forces, torch.Tensor):
+            self.forces_history.append(predicted_forces.detach().cpu().numpy())
+        else:
+            self.forces_history.append(np.asanyarray(predicted_forces))
         if np.max(self.forces_history[-1]) < fmax:
             self.converged = True
             return
