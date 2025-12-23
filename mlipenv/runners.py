@@ -5,7 +5,7 @@ import logging
 import numpy as np
 from ase import Atoms
 
-from mlipenv.calculators import get_calc
+from mlipenv.calculators import get_calc, build_calculator_options
 from mlipenv.optimization_options import OptimizationConfiguration, EnergyConfiguration
 from mlipenv.enums.output_enum import _output_file_registry
 from mlipenv.optimizers import BetterBFGS
@@ -16,11 +16,12 @@ class BaseRunner:
 
     debug = os.environ.get("DEBUG")
 
-    def __init__(self, atoms, coordinates, charge, spin, **kwargs):
+    def __init__(self, atoms, coordinates, charge, spin, calculator_options, **kwargs):
         self.atoms = atoms
         self.coordinates = coordinates
         self.charge = charge
         self.spin = spin
+        self.calculator_options = build_calculator_options(calculator_options)
 
     def load_config_with_defaults(self, config):
         if isinstance(self.charge, int):
@@ -41,7 +42,7 @@ class BaseRunner:
         atoms = Atoms(symbols=atom_symbols, positions=coordinates)
         atoms.info["charge"] = charge
         atoms.info["spin"] = self.spin
-        calc = get_calc()
+        calc = get_calc(self.calculator_options)
         atoms.calc = calc
         return atoms
     
@@ -182,19 +183,19 @@ class BetterOptimizationRunner(ASEOptimizationRunner):
             raise NotImplementedError(f"BetterOptimizationRunner is not currently written for {os.environ["CALCULATOR"]} calculator.")
         from mlipenv.calculators import get_fairchem_predict_unit
         from fairchem.core.datasets.atomic_data import AtomicData, atomicdata_list_to_batch
-        predictor = get_fairchem_predict_unit()
+        predictor = get_fairchem_predict_unit(self.calculator_options.device)
         optimizers = [BetterBFGS(atoms, coords, charge, idx)
                       for idx, (atoms, coords, charge) in enumerate(zip(self.atoms, self.coordinates, self.charge))]
         torch_times = []
         bfgs_times = []
         for i in range(self.options.steps):
-            logger.info(f"optimization step: {i}")
             unconverged_optimizers = [optimizer for optimizer in optimizers if not optimizer.converged]
+            logger.info(f"optimization step: {i}. num unconverged = {len(unconverged_optimizers)}/{len(optimizers)}")
             if not len(unconverged_optimizers):
                 break
-            if self.debug and self.debug.lower() == "true":
-                print(f"step {i}")
-                print(f"num unconverged = {len(unconverged_optimizers)}")
+            # if self.debug and self.debug.lower() == "true":
+            #     print(f"step {i}")
+            #     print(f"num unconverged = {len(unconverged_optimizers)}")
             atomic_data = [AtomicData.from_ase(optimizer.ase_atoms, task_name="omol")
                            for optimizer in unconverged_optimizers]
             batch = atomicdata_list_to_batch(atomic_data)

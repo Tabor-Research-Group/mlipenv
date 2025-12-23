@@ -1,22 +1,43 @@
 import os
+import logging
+from dataclasses import asdict
 
 from mlipenv.util import find_file
+from mlipenv.optimization_options import CalculatorConfiguration, MACECalculatorConfiguration, AIMNetCalculatorConfiguration
 
-def get_calc(**kwargs):
-    calculator = os.environ["CALCULATOR"].lower()
-    if calculator == "fairchem":
-        return get_fairchem_calc(**kwargs)
-    elif calculator == "aimnet2":
-        return get_aimnet_calc(**kwargs)
-    elif calculator == "mace":
-        return get_mace_calc(**kwargs)
+logger = logging.getLogger(__name__)
+
+CALCULATOR = os.environ["CALCULATOR"].lower()
+
+def get_calc(calculator_options):
+    if CALCULATOR == "fairchem":
+        return get_fairchem_calc(**asdict(calculator_options))
+    elif CALCULATOR == "aimnet2":
+        return get_aimnet_calc(**asdict(calculator_options))
+    elif CALCULATOR == "mace":
+        return get_mace_calc(**asdict(calculator_options))
     else:
-        raise ValueError("be careful messing with `CALCULATOR` environment variable!")
-
+        raise ValueError("be careful messing with the `CALCULATOR` environment variable!")
+    
+def build_calculator_options(calculator_options):
+    import torch.cuda
+    detected_device = "gpu" if torch.cuda.is_available() else "cpu"
+    if not calculator_options["device"]:
+        calculator_options["device"] = detected_device
+    elif calculator_options["device"] != detected_device:
+        logger.warning(f"detected hardware: {detected_device}. using the device that you requested ({calculator_options["device"]})")
+    if CALCULATOR == "fairchem":
+        return CalculatorConfiguration(**calculator_options)
+    elif CALCULATOR == "aimnet2":
+        return AIMNetCalculatorConfiguration(**calculator_options)
+    elif CALCULATOR == "mace":
+        return MACECalculatorConfiguration(**calculator_options)
+    else:
+        raise ValueError("be careful messing with the `CALCULATOR` environment variable!")
+    
 MODEL_CACHE_DIR = "MODEL_CACHE_DIR"
 DEFAULT_CACHE_DIR = "DEFAULT_MODEL_CACHE_DIR"
-
-def get_fairchem_predict_unit(model="uma-s-1p1", device="cpu"):
+def get_fairchem_predict_unit(device, model="uma-s-1p1"):
     cache_locs = []
     if MODEL_CACHE_DIR in os.environ:
         cache_locs.append(os.environ[MODEL_CACHE_DIR])
@@ -37,20 +58,41 @@ def get_fairchem_predict_unit(model="uma-s-1p1", device="cpu"):
         except:
             pass
 
-def get_fairchem_calc(model="uma-s-1p1", task_name="omol", device="cpu"):
+def get_fairchem_calc(device, model="uma-s-1p1", task_name="omol", **kwargs):
     from fairchem.core.calculate.ase_calculator import FAIRChemCalculator
     try:
-        predictor = get_fairchem_predict_unit(model, device)
+        predictor = get_fairchem_predict_unit(device, model)
         return FAIRChemCalculator(predictor, task_name=task_name)
     except:
         raise ValueError(f"could not load model files. you should check on `{MODEL_CACHE_DIR}` and/or `{DEFAULT_CACHE_DIR}`")
 
-def get_aimnet_calc(base_calc="aimnet2"):
+AIMNET_DEFAULT_CALC="aimnet2"
+def get_aimnet_calc(model_path, **kwargs):
     from aimnet2calc import AIMNet2ASE
-    return AIMNet2ASE(base_calc=base_calc)
+    if model_path:
+        try:
+            return AIMNet2ASE(base_calc=model_path)
+        except:
+            logger.warning(f"could not load the model from path {model_path}. proceeding with default.")
+    return AIMNet2ASE(base_calc=AIMNET_DEFAULT_CALC)
     # return AIMNet2ASE(base_calc="aimnet2", charge=0, mult=1)
 
-def get_mace_calc(calculator="mace_omol", model="extra_large", device="cpu"):
+# def get_mace_model_registry():
+#     return {
+#     ("mace_omol", "extra_large"): "MACE-omol-0-extra-large-1024.model"
+# }
+
+MACE_DEFAULT_MODEL_PATH="/home/models/MACE-omol-0-extra-large-1024.model"
+def get_mace_calc(model_path, calculator, device, **kwargs):
     import mace.calculators
     calc_cls = getattr(mace.calculators, calculator)
-    return calc_cls(model=model, device=device, default_dtype='float64')
+    if model_path:
+        try:
+            calc_cls(model=model_path, device=device)
+        except:
+            logger.warning(f"could not load the model from path {model_path}. proceeding with default.")
+    model_path = MACE_DEFAULT_MODEL_PATH
+    # model_fn = get_mace_model_registry.get((calculator, model), None)
+    # if model_fn:
+    #     model = os.path.join("/home/models", model_fn)
+    return calc_cls(model=model_path, device=device)

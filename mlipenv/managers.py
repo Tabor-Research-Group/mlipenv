@@ -16,6 +16,7 @@ class BaseManager:
         self.charge = config.charge
         self.spin = config.spin
         self.output_dir = config.output_dir
+        self.calculator_options = config.calculator_options
 
     def _load_parameter(self, parameter_bundle):
         if isinstance(parameter_bundle, str):
