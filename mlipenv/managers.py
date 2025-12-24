@@ -5,7 +5,7 @@ import logging
 
 import numpy as np
 
-from mlipenv.runners import ASEOptimizationRunner, SciPyOptimizationRunner, BetterOptimizationRunner, EnergyRunner
+from mlipenv.runners import ASEOptimizationRunner, BetterOptimizationRunner, EnergyRunner
 
 logger = logging.getLogger(__name__)
 

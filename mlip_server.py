@@ -1,8 +1,14 @@
 from io import StringIO
 from contextlib import redirect_stdout, redirect_stderr
 import traceback
+import logging
 
 from servers.node_comm import *
+
+logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
 
 class MLIPHandler(NodeCommHandler):
 
@@ -21,8 +27,12 @@ class MLIPHandler(NodeCommHandler):
                 "stderr": "no args provided"
             }
         else:
+            buffer = StringIO()
+            root = logging.getLogger()
+            handler = logging.StreamHandler(buffer)
+            handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+            root.addHandler(handler)
             try:
-                buffer = StringIO()
                 with redirect_stdout(buffer), redirect_stderr(buffer):
                     call_to_mlip_server(*args)
                 response = {
@@ -34,6 +44,10 @@ class MLIPHandler(NodeCommHandler):
                     "stdout": buffer.getvalue(),
                     "stderr": traceback.format_exc(limit=10)
                 }
+            finally:
+                root.removeHandler(handler)
+                handler.close()
+            
         return response 
 
 if __name__ == "__main__":

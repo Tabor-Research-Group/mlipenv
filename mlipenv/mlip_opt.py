@@ -1,16 +1,9 @@
 import os
 import json
-import logging
 
 from mlipenv.managers import OptimizationManager, EnergyManager
 from mlipenv.optimization_options import BaseConfiguration, structure_path_keys
 
-def configure_logger():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-    logging.getLogger(__name__).info("logger configured")
 
 def load_config(config_bundle):
     if isinstance(config_bundle, str):
@@ -46,7 +39,6 @@ def get_runner_for_method(config):
         raise NotImplementedError(f"Unknown method type: {config.method}")
 
 def call_to_mlip_server(config_bundle):
-    configure_logger()
     config = load_config(config_bundle)
     runner = get_runner_for_method(config)
     runner.run()
