@@ -26,10 +26,14 @@ class BaseRunner:
     def load_config_with_defaults(self, config):
         if isinstance(self.charge, int):
             self.charge = [self.charge] * len(self.coordinates)
+        self.charge = np.asanyarray(self.charge)
+        # in case you want to template charges in chunks
+        charge_template = np.asarray(self.charge[-1]).flatten()
+        self.charge = self.charge.flatten()
         if len(self.atoms) < len(self.coordinates):
             self.atoms = self.atoms + [self.atoms[-1]] * (len(self.coordinates) - len(self.atoms))
-        if len(self.charge) < len(self.coordinates):
-            self.charge = self.charge + [self.charge[-1]] * (len(self.coordinates) - len(self.charge))
+        while len(self.charge) < len(self.coordinates):
+            self.charge = np.append(self.charge, charge_template)
     
     def export_results(self, output_dir):
         self.export_results_subroutine(output_dir)
@@ -39,10 +43,13 @@ class BaseRunner:
             np.savez(loc, *res)
 
     def atomize(self, atom_symbols, coordinates, charge):
+        import time
         atoms = Atoms(symbols=atom_symbols, positions=coordinates)
-        atoms.info["charge"] = charge
+        atoms.info["charge"] = int(charge)
         atoms.info["spin"] = self.spin
+        t1=time.time()
         calc = get_calc(self.calculator_options)
+        logger.info(f"loading time for calculator: {time.time()-t1:.3f} seconds.")
         atoms.calc = calc
         return atoms
     
@@ -181,9 +188,11 @@ class BetterOptimizationRunner(ASEOptimizationRunner):
         import time
         if not os.environ["CALCULATOR"].lower() == "fairchem":
             raise NotImplementedError(f"BetterOptimizationRunner is not currently written for {os.environ["CALCULATOR"]} calculator.")
+        t1=time.time()
         from mlipenv.calculators import get_fairchem_predict_unit
         from fairchem.core.datasets.atomic_data import AtomicData, atomicdata_list_to_batch
         predictor = get_fairchem_predict_unit(self.calculator_options.device)
+        logger.info(f"loading time for calculator: {time.time()-t1:.3f} seconds.")
         optimizers = [BetterBFGS(atoms, coords, charge, idx)
                       for idx, (atoms, coords, charge) in enumerate(zip(self.atoms, self.coordinates, self.charge))]
         torch_times = []

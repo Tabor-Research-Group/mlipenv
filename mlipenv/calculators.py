@@ -22,7 +22,7 @@ def get_calc(calculator_options):
 def build_calculator_options(calculator_options):
     import torch.cuda
     detected_device = "cuda" if torch.cuda.is_available() else "cpu"
-    if not calculator_options["device"] or (calculator_options["device"] == "gpu" and detected_device == "cuda"):
+    if "device" not in calculator_options or (calculator_options["device"] == "gpu" and detected_device == "cuda"):
         calculator_options["device"] = detected_device
     elif calculator_options["device"] != detected_device:
         logger.warning(f"detected hardware: {detected_device}. using the device that you requested. ({calculator_options["device"]}.) ...")
