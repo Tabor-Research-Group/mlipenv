@@ -1,55 +1,43 @@
 import os
 import logging
 
+from mlipenv.options import get_config
+
 logger = logging.getLogger(__name__)
 
-# def configuration_builder(method, atoms, coordinates, output_dir, **kwargs):
+CONFIG_BUILDER_REGISTRY = {}
+def register_config_builder(name, config_factory=None):
+    if config_factory is None:
+        def register(config_factory):
+            return register_config_builder(name, config_factory)
+        return register
+    else:
+        CONFIG_BUILDER_REGISTRY[name] = config_factory
+        return config_factory
+    
+def get_config_builder(name, **kwargs):
+    return CONFIG_BUILDER_REGISTRY[name](**kwargs)
+
+@register_config_builder("optimization")
+def build_optimization_config(config, optimizer_options, calculator_options):
+    config["optimizer_options"] = optimizer_options
+    config["calculator_options"] = calculator_options
+
+@register_config_builder("energy")
+def build_energy_config(config, **kwargs):
+    config["energy_options"] = kwargs
+
 def configuration_builder(method, 
                           atoms, 
                           coordinates, 
                           charge, 
                           spin, 
                           output_dir=".", 
-                          device=None,
-                          model_path=None,
-                          mace_calculator=None,
                           **kwargs):
     from dataclasses import asdict
-    from mlipenv.options import get_config
-
-    if method == "optimize":
-        options = build_optimization_config(**kwargs)
-    elif method == "energy":
-        options = build_energy_config(**kwargs)
-    else:
-        raise NotImplementedError
-    if mace_calculator is not None:
-        calculator_options = get_config("mace")(device, model_path, mace_calculator)
-    elif model_path is not None:
-        calculator_options = get_config("aimnet")(device, model_path)
-    else:
-        calculator_options = get_config("calculator")(device)
-    return asdict(get_config("base")(method, 
-                                    options, 
-                                    atoms, 
-                                    coordinates, 
-                                    charge, 
-                                    spin, 
-                                    output_dir, 
-                                    calculator_options))
-
-# NEED TO FIX: I can't tell what the point of this function was.
-def build_optimization_config(optimizer, **kwargs):
-    # from mlipenv.optimization_options import get_config
-    optimizer = optimizer.lower()
-    if optimizer == "ase":
-        config = OptimizationConfiguration(optimizer, **kwargs)
-    elif "better" in optimizer:
-        config = OptimizationConfiguration(optimizer, **kwargs)
+    config = asdict(get_config("base")(method, atoms, coordinates, charge, spin, output_dir))
+    get_config_builder(method)(config, **kwargs)
     return config
-
-def build_energy_config(**kwargs):
-    ...
 
 def find_file(root, target):
     for dirpath, dirs, files in os.walk(root):

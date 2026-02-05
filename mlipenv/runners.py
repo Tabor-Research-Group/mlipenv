@@ -57,12 +57,11 @@ class BaseRunner:
 
     def atomize(self, atom_symbols, coordinates, charge):
         import time
-        from dataclasses import asdict
         atoms = Atoms(symbols=atom_symbols, positions=coordinates)
         atoms.info["charge"] = int(charge)
         atoms.info["spin"] = self.spin
         t1=time.time()
-        calc = get_calc(**asdict(self.calculator_options))
+        calc = self.get_calc_for_runner()
         logger.info(f"loading time for calculator: {time.time()-t1:.3f} seconds.")
         atoms.calc = calc
         return atoms
@@ -72,6 +71,10 @@ class BaseRunner:
 
     def export_results_subroutine(self):
         pass
+
+    def get_calc_for_runner(self):
+        from dataclasses import asdict
+        return get_calc(**asdict(self.calculator_options))
 
     @abc.abstractmethod
     def result_getters():
@@ -145,7 +148,10 @@ class BaseOptimizationRunner(BaseRunner):
                 calculator_options = dict()
             calculator_options["device"] = "cuda" if torch.cuda.is_available() else "cpu"
         self.calculator_options, self.loose_calc_kwargs = build_calculator_options(configuration_cls, **calculator_options)
-        print(self.calculator_options, self.loose_calc_kwargs)
+
+    def get_calc_for_runner(self):
+        from dataclasses import asdict
+        return get_calc(**asdict(self.calculator_options), **self.loose_calc_kwargs)
 
     @abc.abstractmethod
     def get_atom_symbols(self, obj):

@@ -12,7 +12,6 @@ def spy_optimizer(optimizer=None, **kwargs):
 def get_runner_for_method(base_config, runner_args):
     if base_config.method == "optimize":
         optimizer = spy_optimizer(**runner_args)
-        print(optimizer)
         return get_runner(optimizer)(base_config, **runner_args)
     elif base_config.method == "energy":
         return get_runner("energy")(base_config, **runner_args)
