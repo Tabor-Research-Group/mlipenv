@@ -1,15 +1,20 @@
 {
     "method": "optimize",
-    "options":
+    "atoms": "test/atoms.npz",
+    "coordinates": "test/coordinates.npz",
+    "charge": 0,
+    "spin": 1,
+    "output_dir": ".",
+    "optimization_options":
     {
         "optimizer": "better",
         "output": ["atoms", "coordinates", "gradients", "energies"],
         "fmax": 0.02,
         "steps": 500
     },
-    "atoms": "test/atoms.npz",
-    "coordinates": "test/coordinates.npz",
-    "charge": 0,
-    "spin": 1,
-    "output_dir": "."
+    "calculator_options":
+    {
+	    "device": "cpu"
+    }
 }
+

@@ -1,12 +1,12 @@
 {
     "method": "energy",
-    "options": 
-    { 
-        "order": 1
-    },
     "atoms": "test/atoms.npz",
     "coordinates": "test/coordinates.npz",
     "charge": 0,
     "spin": 1,
-    "output_dir": "."
+    "output_dir": ".",
+    "energy_options": 
+    { 
+        "order": 1
+    }
 }
