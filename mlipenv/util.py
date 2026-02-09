@@ -1,7 +1,7 @@
 import os
 import logging
 
-from mlipenv.options import get_config
+from mlipenv.options import get_configuration
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def configuration_builder(method,
                           output_dir=".", 
                           **kwargs):
     from dataclasses import asdict
-    config = asdict(get_config("base")(method, atoms, coordinates, charge, spin, output_dir))
+    config = asdict(get_configuration("base")(method, atoms, coordinates, charge, spin, output_dir))
     get_config_builder(method)(config, **kwargs)
     return config
 
@@ -45,17 +45,22 @@ def find_file(root, target):
             return os.path.join(dirpath, target)
     return None
 
+DEFAULT_CHARGE=0
 def convert_from_xyz(file):
     import re
     with open(file, "r") as f:
         _ = int(f.readline().strip())
-        f.readline()
+        optional_info_line = f.readline()
+        try:
+            charge = int(optional_info_line.strip())
+        except:
+            charge = DEFAULT_CHARGE
         atoms, coordinates = zip(*[
-            (m[0], m[1:]) for line in f.readlines() if (m := re.match(r'\s*([A-Za-z]+)\s+(-?\d*\.\d+)\s+(-?\d*\.\d+)\s+(-?\d*\.\d+)\s*', line).groups())
+            (m[0], m[1:]) for line in f.readlines() if (m := re.match(r'\s*([A-Za-z]+)\s+(-?\d*\.\d+|\d+)\s+(-?\d*\.\d+|\d+)\s+(-?\d*\.\d+|\d+)\s*', line).groups())
         ])
-    return atoms, coordinates
+    return atoms, coordinates, charge
 
-def _convert_to_nparr(file):
+def _convert_molecules_to_nparr(file):
     if file.endswith(".xyz"):
         try:
             return convert_from_xyz(file)
@@ -64,15 +69,15 @@ def _convert_to_nparr(file):
     # this is where you would add support for other input file types.
     else:
         logger.error(f"could not find a parser for file {file}. continuing without it.")
-    return None, None
+    return None, None, None
 
-def convert_to_nparr(fp_like):
+def convert_molecules_to_nparr(fp_like):
     if os.path.isdir(fp_like):
         files = [os.path.join(dp, fn) for dp, dn, fns in os.walk(fp_like) for fn in fns]
     else:
         files = [fp_like]
-    atoms_list, coordinates_list = map(list, zip(*[_convert_to_nparr(file) for file in files]))
-    return atoms_list, coordinates_list
+    atoms_list, coordinates_list, charge_list = map(list, zip(*[_convert_molecules_to_nparr(file) for file in files]))
+    return atoms_list, coordinates_list, charge_list
 
 def load_config(config_bundle):
     import json
@@ -93,11 +98,11 @@ def load_config(config_bundle):
         raise NotImplementedError(f"Intractable input type: {type(config_bundle)}")
     found_structure_path_key = next((s for s in STRUCTURE_PATH_KEYS if s in config), None)
     if found_structure_path_key:
-        from mlipenv.util import convert_to_nparr
-        atoms, coordinates = convert_to_nparr(config[found_structure_path_key])
+        atoms, coordinates, charge = convert_molecules_to_nparr(config[found_structure_path_key])
         # I give up. these keys are hard-coded.
         config["atoms"] = atoms
         config["coordinates"] = coordinates
+        config["charge"] = charge
         config.pop(found_structure_path_key, None)
     return config
 
