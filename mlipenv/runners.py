@@ -228,7 +228,7 @@ class BetterOptimizationRunner(BaseOptimizationRunner):
         from fairchem.core.datasets.atomic_data import AtomicData, atomicdata_list_to_batch
         predictor = get_fairchem_predict_unit(self.calculator_options.device)
         logger.info(f"loading time for calculator: {time.time()-t1:.3f} seconds.")
-        optimizers = [BetterBFGS(atoms, coords, charge, idx)
+        optimizers = [BetterBFGS(atoms, coords, charge, self.spin, idx)
                       for idx, (atoms, coords, charge) in enumerate(zip(self.atoms, self.coordinates, self.charge))]
         torch_times = []
         bfgs_times = []
@@ -240,7 +240,7 @@ class BetterOptimizationRunner(BaseOptimizationRunner):
             # if self.debug and self.debug.lower() == "true":
             #     print(f"step {i}")
             #     print(f"num unconverged = {len(unconverged_optimizers)}")
-            atomic_data = [AtomicData.from_ase(optimizer.ase_atoms, task_name="omol")
+            atomic_data = [AtomicData.from_ase(optimizer.ase_atoms, task_name="omol", r_data_keys=["charge", "spin"])
                            for optimizer in unconverged_optimizers]
             batch = atomicdata_list_to_batch(atomic_data)
             t1 = time.time()

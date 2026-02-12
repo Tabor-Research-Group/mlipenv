@@ -6,11 +6,11 @@ import torch
 
 class BetterBFGS:
 
-    def __init__(self, atoms, coordinates, charge, index):
+    def __init__(self, atoms, coordinates, charge, spin, index):
         self.atoms = atoms
         self.index = index
         self.ase_atoms = Atoms(atoms, coordinates)
-        self.ase_atoms.info.update({"charge": charge})
+        self.ase_atoms.info.update({"charge": charge, "spin": spin})
         self.coordinates_history = [np.asarray(coordinates, dtype=np.float64)]
         self.forces_history = []
         self.prev_hessian = None
