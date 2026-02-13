@@ -1,5 +1,5 @@
 {
-    "method": "optimize",
+    "method": "optimization",
     "atoms": "test/atoms.npz",
     "coordinates": "test/coordinates.npz",
     "charge": 0,

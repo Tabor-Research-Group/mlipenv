@@ -10,7 +10,7 @@ def spy_optimizer(optimizer=None, **kwargs):
     return optimizer
     
 def get_runner_for_method(base_config, runner_args):
-    if base_config.method == "optimize":
+    if base_config.method == "optimization":
         optimizer = spy_optimizer(**runner_args)
         return get_runner(optimizer)(base_config, **runner_args)
     elif base_config.method == "energy":

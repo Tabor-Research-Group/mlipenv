@@ -142,10 +142,10 @@ class BaseOptimizationRunner(BaseRunner):
             configuration_cls = get_configuration(config_type)
         except:
             configuration_cls = get_configuration("calculator")
+        if not calculator_options:
+                calculator_options = dict()
         if "device" not in calculator_options:
             import torch.cuda
-            if not calculator_options:
-                calculator_options = dict()
             calculator_options["device"] = "cuda" if torch.cuda.is_available() else "cpu"
         self.calculator_options, self.loose_calc_kwargs = build_calculator_options(configuration_cls, **calculator_options)
 
