@@ -15,12 +15,12 @@ def register_config_builder(name, config_factory=None):
         CONFIG_BUILDER_REGISTRY[name] = config_factory
         return config_factory
     
-def get_config_builder(name, **kwargs):
-    return CONFIG_BUILDER_REGISTRY[name](**kwargs)
+def get_config_builder(name):
+    return CONFIG_BUILDER_REGISTRY[name]
 
 @register_config_builder("optimization")
-def build_optimization_config(config, optimizer_options, calculator_options):
-    config["optimizer_options"] = optimizer_options
+def build_optimization_config(config, optimization_options=None, calculator_options=None):
+    config["optimization_options"] = optimization_options
     config["calculator_options"] = calculator_options
 
 @register_config_builder("energy")
@@ -36,7 +36,7 @@ def configuration_builder(method,
                           **kwargs):
     from dataclasses import asdict
     config = asdict(get_configuration("base")(method, atoms, coordinates, charge, spin, output_dir))
-    get_config_builder(method)(config, **kwargs)
+    get_config_builder(method)(config=config, **kwargs)
     return config
 
 def find_file(root, target):
