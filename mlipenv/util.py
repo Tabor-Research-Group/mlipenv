@@ -117,8 +117,8 @@ def load_multidim_parameter(parameter_bundle):
                 parameter = data[data.files[0]]
                 # runners enforce one-at-a-time batching, if the input
                 # is a multi-dim np array, we splice it up here.
-                if parameter.ndim > 2:
-                    parameter = [parameter[i] for i in parameter.shape[0]]
+                if parameter.ndim > 1:
+                    parameter = [parameter[i] for i in range(parameter.shape[0])]
                 else:
                     parameter = [parameter]
     elif isinstance(parameter_bundle, list):

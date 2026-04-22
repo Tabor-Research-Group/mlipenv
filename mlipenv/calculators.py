@@ -71,8 +71,8 @@ def get_aimnet_calc(model_path, **kwargs):
     return AIMNet2ASE(base_calc=AIMNET_DEFAULT_CALC)
 
 MACE_DEFAULT_MODEL_PATH="/home/models/MACE-omol-0-extra-large-1024.model"
-MACE_CALCULATOR_TYPES=["mace_omol", "mace_off", "mace_mp", "mace_anicc"]
-MACE_CALCULATOR_ALIASES=["omol" "off", "mp", "anicc"]
+MACE_CALCULATOR_TYPES=["mace_omol", "mace_off", "mace_mp", "mace_anicc", "mace_polar"]
+MACE_CALCULATOR_ALIASES=["omol", "off", "mp", "anicc", "polar"]
 @register_calculator("mace")
 def get_mace_calc(model_path, mace_calculator, device, **kwargs):
     import mace.calculators
@@ -91,7 +91,17 @@ def get_mace_calc(model_path, mace_calculator, device, **kwargs):
     #     except:
     #         logger.warning(f"could not load the model from path {model_path}. proceeding with default.")
     logger.info("no valid model found. using default model and type...")
-    model_path = MACE_DEFAULT_MODEL_PATH
+    # model_path = MACE_DEFAULT_MODEL_PATH
+    # calc_cls = getattr(mace.calculators, "mace_omol")
     return calc_cls(model=model_path, device=device)
 
-
+DEFAULT_UPET_MODEL="pet-mad-s"
+@register_calculator("upet")
+def get_upet_calc(checkpoint_path=None, device=None, **kwargs):
+    from upet.calculator import UPETCalculator
+    if checkpoint_path:
+        try:
+            return UPETCalculator(checkpoint_path=checkpoint_path, device=device, **kwargs)
+        except:
+            logger.warning(f"could not load the model from path {checkpoint_path}. proceeding with default.")
+    return UPETCalculator(model=DEFAULT_UPET_MODEL, device=device)

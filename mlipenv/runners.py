@@ -30,7 +30,7 @@ class BaseRunner:
     debug = os.environ.get("DEBUG")
     def __init__(self, base_config, **kwargs):
         self.atoms = load_multidim_parameter(base_config.atoms)
-        self.coordinates = load_multidim_parameter(base_config.coordinates)
+        self.coordinates = np.asarray(load_multidim_parameter(base_config.coordinates), dtype=np.float32)
         self.charge = self.load_charge(base_config.charge)
         self.spin = base_config.spin
         self.output_dir = base_config.output_dir
@@ -56,14 +56,10 @@ class BaseRunner:
             np.savez(loc, *res)
 
     def atomize(self, atom_symbols, coordinates, charge):
-        import time
         atoms = Atoms(symbols=atom_symbols, positions=coordinates)
         atoms.info["charge"] = int(charge)
         atoms.info["spin"] = self.spin
-        t1=time.time()
-        calc = self.get_calc_for_runner()
-        logger.info(f"loading time for calculator: {time.time()-t1:.3f} seconds.")
-        atoms.calc = calc
+        atoms.calc = self.calc
         return atoms
     
     def format_results(self):
@@ -169,9 +165,13 @@ class BaseOptimizationRunner(BaseRunner):
 @register_runner("ase")
 class ASEOptimizationRunner(BaseOptimizationRunner):
     def __init__(self, base_config, **kwargs):
+        import time
         super().__init__(base_config, **kwargs)
         self.run_count = 0
-    
+        t1=time.time()
+        self.calc = self.get_calc_for_runner()
+        logger.info(f"loading time for calculator: {time.time()-t1:.3f} seconds.")
+
     def run(self):
         optimized_atoms = [self.run_opt(atoms, coords, charge) 
                            for atoms, coords, charge in zip(self.atoms, self.coordinates, self.charge)]
@@ -200,7 +200,9 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
             trajectory=os.path.join(self.output_dir, "trajectories", f"{self.run_count}.traj"),
             logfile=os.path.join(self.output_dir, "logs", f"{self.run_count}.log")
             )
+        print(f"running opt {self.run_count} for {self.optimization_options.steps} steps...")
         opt.run(fmax=self.optimization_options.fmax, steps=self.optimization_options.steps)
+        print(f"done.")
         self.run_count = self.run_count + 1
         return atoms
 
@@ -252,6 +254,14 @@ class BetterOptimizationRunner(BaseOptimizationRunner):
                 optimizer.remember_energy(preds["energy"][j])
                 optimizer.optimize_and_update(preds["forces"][batch.batch == j], self.optimization_options.fmax)
             bfgs_times.append(time.time()-t2)
+            # if self.debug and self.debug.lower() == "true":
+            #     if hasattr(predictor.model.module.backbone.charge_embedding, "charges"):
+            #         all_charges = predictor.model.module.backbone.charge_embedding.charges
+            #         for atoms, charges in zip([uo.atoms for uo in unconverged_optimizers], all_charges):
+            #             print(atoms, charges, len(unconverged_optimizers))
+            #             for atom, charge in zip(atoms, charges):
+            #                 print(atom, charge)
+            #             print()
         if self.debug and self.debug.lower() == "true":
             print(f"torch times = {torch_times}")
             print(f"bfgs times = {bfgs_times}")
