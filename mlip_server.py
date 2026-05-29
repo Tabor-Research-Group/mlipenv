@@ -1,54 +1,75 @@
 from io import StringIO
 from contextlib import redirect_stdout, redirect_stderr
 import traceback
-import logging
 
 from mlipenv.servers.node_comm import *
-
-logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+from mlipenv.servers.util import register_as_async
 
 class MLIPHandler(NodeCommHandler):
 
     DEFAULT_PORT_ENV_VAR = 'MLIP_SOCKET_PORT'
 
-    def get_methods(self) -> 'dict[str,method]':
+    def subclass_methods(self) -> 'dict[str,method]':
         return {
             "evaluate": self.evaluate,
+            "status": self.check_job_status,
+            "check_job_status": self.check_job_status,
+            "cancel": self.cancel_job,
+            "cancel_job": self.cancel_job,
         }
-    
-    def evaluate(self, args):
-        from mlipenv.mlip_opt import call_to_mlip_server
-        if not len(args):
+
+    @register_as_async
+    def evaluate(self, config=None, *args):
+        if config is None:
             response = {
                 "stdout": "",
                 "stderr": "no args provided"
             }
         else:
-            buffer = StringIO()
-            root = logging.getLogger()
-            handler = logging.StreamHandler(buffer)
-            handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
-            root.addHandler(handler)
+            # print("yo! :3")
             try:
-                with redirect_stdout(buffer), redirect_stderr(buffer):
-                    call_to_mlip_server(*args)
+                # brittle reference
+                job_id = self.server.scheduler.submit_job("mlipenv.manager", config)
                 response = {
-                    "stdout": buffer.getvalue(),
+                    "stdout": f"job has been submitted. job_id = {job_id}",
                     "stderr": ""
-                }
-            except:
+                } 
+            except Exception:
                 response = {
-                    "stdout": buffer.getvalue(),
+                    "stdout": "",
                     "stderr": traceback.format_exc(limit=10)
                 }
-            finally:
-                root.removeHandler(handler)
-                handler.close()
-            
         return response 
+    
+    def check_status(self, job_id=None, *args):
+        try:
+            job_info = self.server.scheduler.query_job(job_id)
+
+            response = {
+                "stdout": f"Status(es):\n{'\n'.join(f"{job_id}: {job['status']}" for job_id, job in job_info.items())}",
+                "stderr": ""
+            } 
+        except Exception:
+            response = {
+                "stdout": "",
+                "stderr": traceback.format_exc(limit=10)
+            }
+        return response
+    
+    def cancel_job(self, job_id, *args):
+        try:
+            response = self.server.scheduler.cancel_job(job_id)
+            response = {
+                "stdout": response,
+                "stderr": ""
+            }
+        except Exception:
+            response = {
+                "stdout": "",
+                "stderr": traceback.format_exc(limit=10)
+            }
+        return response
+
 
 if __name__ == "__main__":
     import sys, os, argparse
@@ -56,18 +77,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port",
                         default=os.environ.get(MLIPHandler.DEFAULT_PORT_ENV_VAR, os.environ.get("SESSION_ID")))
-    parser.add_argument("-c", "--no_server", action="store_true", default=False)
-    parser.add_argument("--allow_scipts",
-                        action="store_true",
-                        default=False)
-    parser.add_argument("request_args",
-                        nargs=argparse.REMAINDER)
+    parser.add_argument("--no_server", action="store_true", default=False)
+    parser.add_argument("--config", default=None)
+    parser.add_argument("request_args", nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
 
     if args.no_server:
         import subprocess
-        subprocess.run(["conda", "run", "--no-capture-output", "-n", "fairchem"] + args.request_args)
+        runtime_args = args.config if args.config is not None else args.request_args
+        subprocess.run(["conda", "run", "--no-capture-output", "-n", "fairchem"] + runtime_args)
 
     port = args.port
     if port is None:
@@ -76,11 +95,20 @@ if __name__ == "__main__":
 
     MLIP_CONNECTION = ('localhost', MLIPHandler.get_valid_port(port))
     
-    try: # implicit server startup ping done for every request
-        MLIPHandler.start_server(connection=MLIP_CONNECTION)
-    except OSError: # server exists
-        if not len(args.request_args):
-            print(f"Already serving on {MLIP_CONNECTION}")
-        pass
-    if len(args.request_args):
-        MLIPHandler.client_request(args.request_args[0], args.request_args[1:], connection=MLIP_CONNECTION)
+    if not len(args.request_args):
+        try: # implicit server startup ping done for every request
+            MLIPHandler.start_server(connection=MLIP_CONNECTION)
+        except OSError: # server exists
+            if not len(args.request_args):
+                print(f"Already serving on {MLIP_CONNECTION}")
+            pass
+    else:
+        try:
+            method, method_args = args.request_args[0], args.request_args[1:]
+            method_args = method_args if args.config is None else args.config
+            buffer = StringIO()
+            with redirect_stdout(buffer), redirect_stderr(buffer):
+                MLIPHandler.client_request(method, method_args, connection=MLIP_CONNECTION)
+        except Exception:
+            raise
+        print(buffer.getvalue())

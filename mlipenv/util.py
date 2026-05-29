@@ -24,8 +24,9 @@ def build_optimization_config(config, optimization_options=None, calculator_opti
     config["calculator_options"] = calculator_options
 
 @register_config_builder("energy")
-def build_energy_config(config, **kwargs):
-    config["energy_options"] = kwargs
+def build_energy_config(config, energy_options=None, calculator_options=None):
+    config["energy_options"] = energy_options
+    config["calculator_options"] = calculator_options
 
 def configuration_builder(method, 
                           atoms, 
@@ -132,3 +133,13 @@ def build_calculator_options(cls, **options):
     filtered_options = {k:v for k,v in options.items() if k in entries}
     extra_options = {k:v for k,v in options.items() if k not in entries}
     return cls(**filtered_options), extra_options
+
+def build_base_config(method, 
+                      atoms, 
+                      coordinates, 
+                      charge, 
+                      spin, 
+                      output_dir=".",
+                      log_file=None,
+                    **kwargs):
+    return get_configuration("base")(method, atoms, coordinates, charge, spin, output_dir, log_file), kwargs

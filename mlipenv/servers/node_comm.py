@@ -6,6 +6,10 @@ import abc
 import os
 import socket, socketserver, json, traceback, subprocess, threading
 import sys
+import io
+from contextlib import redirect_stderr, redirect_stdout
+
+from mlipenv.servers.job_palette import JobScheduler
 
 __all__ = [
     "NodeCommTCPServer",
@@ -26,10 +30,14 @@ def infer_mode(connection):
         raise ValueError(f"invalid connection spec {connection}")
     return mode
 
-class NodeCommTCPServer(socketserver.TCPServer):
+class NodeCommTCPServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
 
-class NodeCommUnixServer(socketserver.UnixStreamServer):
+    def __init__(self, connection, handler_cls, scheduler):
+        super().__init__(connection, handler_cls)
+        self.scheduler = scheduler
+
+class NodeCommUnixServer(socketserver.ThreadingUnixStreamServer):
     allow_reuse_address = True
 
     def server_bind(self):
@@ -43,6 +51,10 @@ class NodeCommUnixServer(socketserver.UnixStreamServer):
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind(self.server_address)
         self.server_address = self.socket.getsockname()
+    
+    def __init__(self, connection, handler_cls, scheduler):
+        super().__init__(connection, handler_cls)
+        self.scheduler = scheduler
 
 class NodeCommClient:
     def __init__(self, connection, timeout=10):
@@ -141,7 +153,7 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
                 "exit": self.stop_server,
                 "shutdown": self.stop_server
             },
-            **self.get_methods()
+            **self.subclass_methods()
         )
     def change_pwd(self, args):
         os.chdir(args[0])
@@ -158,6 +170,8 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
     def setup_env(self, env):
         if 'pwd' in env:
             os.chdir(env['pwd'])
+    def get_methods(self) -> 'dict[str,method]':
+        return self.method_dispatch
     def dispatch_request(self, request: dict, env:dict):
         method = request.get("command", None)
         if method is None:
@@ -182,10 +196,12 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
                 else:
                     try:
                         self.setup_env(env)
-                        response = caller(args)
+                        buffer = io.StringIO()
+                        with redirect_stderr(buffer), redirect_stdout(buffer):
+                            response = caller(*args)
                     except:
                         response = {
-                            "stdout": "",
+                            "stdout": buffer.getvalue(),
                             "stderr": traceback.format_exc(limit=10)
                         }
 
@@ -200,17 +216,17 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
             "stderr":std_err.strip().decode()
         }
     @abc.abstractmethod
-    def get_methods(self) -> 'dict[str,method]':
+    def subclass_methods(self) -> 'dict[str,method]':
         ...
 
     @staticmethod
-    def get_valid_port(git_port, min_port=4000, max_port=65535):
-        git_port = int(git_port)
-        if git_port > max_port:
-            git_port = git_port % max_port
-        if git_port < min_port:
-            git_port = max_port - (git_port % (max_port - min_port))
-        return git_port
+    def get_valid_port(port, min_port=4000, max_port=65535):
+        port = int(port)
+        if port > max_port:
+            port = port % max_port
+        if port < min_port:
+            port = max_port - (port % (max_port - min_port))
+        return port
 
     DEFAULT_CONNECTION = ("localhost", 9999)
     DEFAULT_PORT_ENV_VAR = None
@@ -255,7 +271,8 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
         mode = infer_mode(connection)
         print(f"Starting server at {connection} over {mode}")
         server_type = cls.get_server_type(mode)
-        with server_type(connection, cls) as server:
+        scheduler = JobScheduler()
+        with server_type(connection, cls, scheduler) as server:
             cls.set_server(server)
             # Activate the server; this will keep running until you
             # interrupt the program with Ctrl-C
@@ -295,7 +312,7 @@ class ShellCommHandler(NodeCommHandler):
     def get_subprocess_call_list(self):
         ...
 
-    def get_methods(self) -> 'dict[str,method]':
+    def subclass_methods(self) -> 'dict[str,method]':
         return {
             k:self._wrap_subprocess_call(v)
             for k,v in self.get_subprocess_call_list()

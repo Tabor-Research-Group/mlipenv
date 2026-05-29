@@ -1,0 +1,31 @@
+runtime:
+  method: energy
+  atoms: test/atoms.npz
+  coordinates: test/coordinates.npz
+  charge: 0
+  spin: 1
+  output_dir: .
+  energy_options:
+    optimizer: better
+    order: 1
+  calculator_options:
+    device: cpu
+  log_file: energy.log
+
+environment:
+  container: "/path/to/singularity/container" || conda: "name of or path to conda environment" || venv: "/path/to/venv"
+  vars:
+    debug: true
+    calculator: fairchem
+    model_cache_dir: /path/to/model/cache
+  sbatch:
+    name: my_job
+    output: my_job_%j.out
+    time: 24:00:00
+    mem: 16G
+    ntasks: 1
+    cpus-per-task: 4
+    nodes: 1
+    partition: gpu
+    gres: gpu:1
+
