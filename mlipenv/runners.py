@@ -28,7 +28,7 @@ def get_runner(key):
     return RUNNER_REGISTRY[key]
 
 class BaseRunner:
-    debug = os.environ.get("DEBUG").lower() == "true"
+    debug = os.environ.get("DEBUG", "").lower() == "true"
     def __init__(self, base_config, **kwargs):
         self.atoms = load_multidim_parameter(base_config.atoms)
         self.coordinates = load_multidim_parameter(base_config.coordinates)
@@ -100,7 +100,7 @@ class EnergyRunner(BaseRunner):
                             calculator_options=None,
                             **kwargs
                             ):
-        calc_type = os.environ["CALCULATOR"].lower()
+        calc_type = os.environ.get("CALCULATOR", "").lower()
         self.energy_options = get_configuration("energy")(**energy_options)
         try:
             calc_configuration_cls = get_configuration(calc_type)
@@ -114,15 +114,12 @@ class EnergyRunner(BaseRunner):
         self.calculator_options, self.loose_calc_kwargs = build_calculator_options(calc_configuration_cls, **calculator_options)
     
     def result_getters(self):
-        getters = [self.get_pes_derivatives]
+        getters = [*self.get_pes_derivatives]
         return getters
     
     def get_output_with_defaults(self):
-        output_file_registry = _output_file_registry()
-        output_files = [output_file_registry["energies"].value]
-        if self.energy_options.order > 0:
-            output_files.append(output_file_registry["gradients"].value)
-        return [os.path.join(self.output_dir, file) for file in output_files]
+        derivatives_dname = "derivatives"
+        return [os.path.join(self.output_dir, derivatives_dname, f"{n}.npz") for n in range(self.order)]
     
     def run(self):
         self.results = [self.atomize(atoms, coords, charge) 
@@ -135,12 +132,10 @@ class EnergyRunner(BaseRunner):
             derivative_dict["1"] = np.array(obj.get_forces())
         else:
             from mlipenv.differentiation import get_higher_derivatives
-            higher_ders = get_higher_derivatives(obj, calculator=obj.calc, device=self.calculator_options.device, order=self.energy_options.order)
-            derivative_dict = higher_ders
-        return derivative_dict
-
-    # def get_single_point_energy(self, obj):
-    #     return np.array(obj.get_potential_energy())
+            derivative_dict = get_higher_derivatives(obj, calculator=obj.calc, device=self.calculator_options.device, order=self.energy_options.order)
+        self.derivative_dict = derivative_dict
+        return list(derivative_dict.values())
+        
 
 class BaseOptimizationRunner(BaseRunner):
     def __init__(self, base_config, **kwargs):
@@ -159,7 +154,7 @@ class BaseOptimizationRunner(BaseRunner):
                             calculator_options=None,
                             **kwargs
                             ):
-        config_type = os.environ["CALCULATOR"].lower()
+        config_type = os.environ.get("calculator", "").lower()
         self.optimization_options = get_configuration("optimization")(**optimization_options)
         try:
             configuration_cls = get_configuration(config_type)
@@ -226,9 +221,9 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
             trajectory=os.path.join(self.output_dir, "trajectories", f"{self.run_count}.traj"),
             logfile=os.path.join(self.output_dir, "logs", f"{self.run_count}.log")
             )
-        print(f"running opt {self.run_count} for {self.optimization_options.steps} steps...")
+        logger.info(f"running opt {self.run_count} for {self.optimization_options.steps} steps...")
         opt.run(fmax=self.optimization_options.fmax, steps=self.optimization_options.steps)
-        print(f"done.")
+        logger.info(f"done.")
         self.run_count = self.run_count + 1
         return atoms
 
@@ -244,8 +239,8 @@ class SciPyOptimizationRunner(BaseOptimizationRunner):
 @register_runner("better")
 class BetterOptimizationRunner(BaseOptimizationRunner):
     def __init__(self, base_config, **kwargs):
-        if not os.environ["CALCULATOR"].lower() == "fairchem":
-            raise NotImplementedError(f"BetterOptimizationRunner is not currently written for {os.environ["CALCULATOR"]} calculator.")
+        if not os.environ.get("CALCULATOR", "").lower() == "fairchem":
+            raise NotImplementedError(f"BetterOptimizationRunner is not currently written for {os.environ.get('CALCULATOR', '')} calculator.")
         super().__init__(base_config, **kwargs)
 
     def step_optimization(self, optimizers, predictor):
@@ -290,9 +285,9 @@ class BetterOptimizationRunner(BaseOptimizationRunner):
             torch_times.append(torch_time)
             bfgs_times.append(bfgs_time)
             
-        if self.debug and self.debug.lower() == "true":
-            print(f"torch times = {torch_times}")
-            print(f"bfgs times = {bfgs_times}")
+        if self.debug:
+            logger.info(f"torch times = {torch_times}")
+            logger.info(f"bfgs times = {bfgs_times}")
         self.results = optimizers
 
     def get_atom_symbols(self, obj):

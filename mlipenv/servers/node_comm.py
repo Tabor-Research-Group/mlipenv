@@ -6,8 +6,6 @@ import abc
 import os
 import socket, socketserver, json, traceback, subprocess, threading
 import sys
-import io
-from contextlib import redirect_stderr, redirect_stdout
 
 from mlipenv.servers.job_palette import JobScheduler
 
@@ -196,12 +194,10 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
                 else:
                     try:
                         self.setup_env(env)
-                        buffer = io.StringIO()
-                        with redirect_stderr(buffer), redirect_stdout(buffer):
-                            response = caller(*args)
+                        response = caller(*args)
                     except:
                         response = {
-                            "stdout": buffer.getvalue(),
+                            "stdout": "",
                             "stderr": traceback.format_exc(limit=10)
                         }
 

@@ -1,5 +1,3 @@
-from io import StringIO
-from contextlib import redirect_stdout, redirect_stderr
 import traceback
 
 from mlipenv.servers.node_comm import *
@@ -41,7 +39,7 @@ class MLIPHandler(NodeCommHandler):
                 }
         return response 
     
-    def check_status(self, job_id=None, *args):
+    def check_job_status(self, job_id=None, *args):
         try:
             job_info = self.server.scheduler.query_job(job_id)
 
@@ -106,9 +104,6 @@ if __name__ == "__main__":
         try:
             method, method_args = args.request_args[0], args.request_args[1:]
             method_args = method_args if args.config is None else args.config
-            buffer = StringIO()
-            with redirect_stdout(buffer), redirect_stderr(buffer):
-                MLIPHandler.client_request(method, method_args, connection=MLIP_CONNECTION)
+            MLIPHandler.client_request(method, method_args, connection=MLIP_CONNECTION)
         except Exception:
             raise
-        print(buffer.getvalue())
