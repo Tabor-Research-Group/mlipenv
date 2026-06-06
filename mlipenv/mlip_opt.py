@@ -29,7 +29,7 @@ def load_config(config_bundle):
         config["coordinates"] = coordinates
         config.pop(found_structure_path_key, None)
     return BaseConfiguration(**config)
-    
+
 def get_runner_for_method(config):
     if config.method == "optimize":
         return OptimizationManager(config)

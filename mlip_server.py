@@ -1,56 +1,12 @@
-from io import StringIO
-from contextlib import redirect_stdout, redirect_stderr
-import traceback
 import logging
+from mlipenv.client import MLIPHandler
 
-from servers.node_comm import *
-
-logging.basicConfig(
+if __name__ == "__main__":
+    logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-class MLIPHandler(NodeCommHandler):
-
-    DEFAULT_PORT_ENV_VAR = 'MLIP_SOCKET_PORT'
-
-    def get_methods(self) -> 'dict[str,method]':
-        return {
-            "evaluate": self.evaluate,
-        }
-    
-    def evaluate(self, args):
-        from mlipenv.mlip_opt import call_to_mlip_server
-        if not len(args):
-            response = {
-                "stdout": "",
-                "stderr": "no args provided"
-            }
-        else:
-            buffer = StringIO()
-            root = logging.getLogger()
-            handler = logging.StreamHandler(buffer)
-            handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
-            root.addHandler(handler)
-            try:
-                with redirect_stdout(buffer), redirect_stderr(buffer):
-                    call_to_mlip_server(*args)
-                response = {
-                    "stdout": buffer.getvalue(),
-                    "stderr": ""
-                }
-            except:
-                response = {
-                    "stdout": buffer.getvalue(),
-                    "stderr": traceback.format_exc(limit=10)
-                }
-            finally:
-                root.removeHandler(handler)
-                handler.close()
-            
-        return response 
-
-if __name__ == "__main__":
     import sys, os, argparse
 
     parser = argparse.ArgumentParser()

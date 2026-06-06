@@ -9,7 +9,21 @@ from mlipenv.runners import ASEOptimizationRunner, BetterOptimizationRunner, Ene
 
 logger = logging.getLogger(__name__)
 
-class BaseManager:
+class EvaluationManager:
+    manager_registry = {}
+    @classmethod
+    def register_manager(cls, name, runner_type=None):
+        if runner_type is not None:
+            cls.manager_registry[name] = runner_type
+            return runner_type
+        else:
+            def register(runner_type):
+                return cls.register_manager(name, runner_type)
+            return register
+    @classmethod
+    def resolve(cls, manager_type):
+        return cls.manager_registry.get(manager_type, manager_type)
+
     def __init__(self, config):
         self.atoms = self.load_atoms(config.atoms)
         self.coordinates = self.load_coordinates(config.coordinates)
@@ -56,8 +70,8 @@ class BaseManager:
     def run(self):
         ...
 
-
-class EnergyManager(BaseManager):
+@EvaluationManager.register_manager("energy")
+class EnergyManager(EvaluationManager):
     def __init__(self, config):
         super().__init__(config)
         self.config = config.options
@@ -71,7 +85,8 @@ class EnergyManager(BaseManager):
         energy_runner.export_results(self.output_dir)
 
 
-class OptimizationManager(BaseManager):
+@EvaluationManager.register_manager("optimize")
+class OptimizationManager(EvaluationManager):
     def __init__(self, config):
         super().__init__(config)
         self.config = config.options
