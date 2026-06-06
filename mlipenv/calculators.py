@@ -1,40 +1,31 @@
 import os
 import logging
-from dataclasses import asdict
 
 from mlipenv.util import find_file
-from mlipenv.optimization_options import CalculatorConfiguration, MACECalculatorConfiguration, AIMNetCalculatorConfiguration
 
 logger = logging.getLogger(__name__)
 
-CALCULATOR = os.environ["CALCULATOR"].lower()
 
-def get_calc(calculator_options):
-    if CALCULATOR == "fairchem":
-        return get_fairchem_calc(**asdict(calculator_options))
-    elif CALCULATOR == "aimnet2":
-        return get_aimnet_calc(**asdict(calculator_options))
-    elif CALCULATOR == "mace":
-        return get_mace_calc(**asdict(calculator_options))
+CALCULATOR_REGISTRY = {}
+def register_calculator(name, calc_factory=None):
+    if calc_factory is None:
+        # used as a decorator i.e.
+        # @register_calculator(name)
+        # def calc(...): ...
+        def register(calc_factory):
+            return register_calculator(name, calc_factory)
+        return register
     else:
-        raise ValueError("be careful messing with the `CALCULATOR` environment variable!")
-    
-def build_calculator_options(calculator_options):
-    import torch.cuda
-    detected_device = "cuda" if torch.cuda.is_available() else "cpu"
-    if "device" not in calculator_options or (calculator_options["device"] == "gpu" and detected_device == "cuda"):
-        calculator_options["device"] = detected_device
-    elif calculator_options["device"] != detected_device:
-        logger.warning(f"detected hardware: {detected_device}. using the device that you requested. ({calculator_options["device"]}.) ...")
-    if CALCULATOR == "fairchem":
-        return CalculatorConfiguration(**calculator_options)
-    elif CALCULATOR == "aimnet2":
-        return AIMNetCalculatorConfiguration(**calculator_options)
-    elif CALCULATOR == "mace":
-        return MACECalculatorConfiguration(**calculator_options)
-    else:
-        raise ValueError("be careful messing with the `CALCULATOR` environment variable!")
-    
+        CALCULATOR_REGISTRY[name] = calc_factory
+        return calc_factory
+
+def get_calc(*, calculator=None, **calculator_options):
+    if calculator is None:
+        calculator = os.environ.get("CALCULATOR").lower()
+    if isinstance(calculator, str):
+        calculator = CALCULATOR_REGISTRY[calculator]
+    return calculator(**calculator_options)
+
 MODEL_CACHE_DIR = "MODEL_CACHE_DIR"
 DEFAULT_CACHE_DIR = "DEFAULT_MODEL_CACHE_DIR"
 def get_fairchem_predict_unit(device, model="uma-s-1p1"):
@@ -58,50 +49,59 @@ def get_fairchem_predict_unit(device, model="uma-s-1p1"):
         except:
             pass
 
+@register_calculator("fairchem")
 def get_fairchem_calc(device, model="uma-s-1p1", task_name="omol", **kwargs):
     from fairchem.core.calculate.ase_calculator import FAIRChemCalculator
     try:
         predictor = get_fairchem_predict_unit(device, model)
-        return FAIRChemCalculator(predictor, task_name=task_name)
+        return FAIRChemCalculator(predictor, task_name=task_name, **kwargs)
     except:
         raise ValueError(f"could not load model files. you should check on `{MODEL_CACHE_DIR}` and/or `{DEFAULT_CACHE_DIR}`")
 
 AIMNET_DEFAULT_CALC="aimnet2"
+@register_calculator("aimnet")
+@register_calculator("aimnet2")
 def get_aimnet_calc(model_path, **kwargs):
     from aimnet2calc import AIMNet2ASE
     if model_path:
         try:
-            return AIMNet2ASE(base_calc=model_path)
+            return AIMNet2ASE(base_calc=model_path, **kwargs)
         except:
             logger.warning(f"could not load the model from path {model_path}. proceeding with default.")
     return AIMNet2ASE(base_calc=AIMNET_DEFAULT_CALC)
-    # return AIMNet2ASE(base_calc="aimnet2", charge=0, mult=1)
-
-# def get_mace_model_registry():
-#     return {
-#     ("mace_omol", "extra_large"): "MACE-omol-0-extra-large-1024.model"
-# }
 
 MACE_DEFAULT_MODEL_PATH="/home/models/MACE-omol-0-extra-large-1024.model"
-def get_mace_calc(model_path, calculator, device, **kwargs):
+MACE_CALCULATOR_TYPES=["mace_omol", "mace_off", "mace_mp", "mace_anicc", "mace_polar"]
+MACE_CALCULATOR_ALIASES=["omol", "off", "mp", "anicc", "polar"]
+@register_calculator("mace")
+def get_mace_calc(model_path, mace_calculator, device, **kwargs):
     import mace.calculators
-    calculator = calculator.lower()
-    if calculator == "omol":
-        calculator = "mace_omol"
-    elif calculator == "off":
-        calculator = "mace_off"
-    elif calculator == "mp":
-        calculator = "mace_mp"
-    elif calculator == "anicc":
-        calculator = "mace_anicc"
-    calc_cls = getattr(mace.calculators, calculator)
-    if model_path:
-        try:
-            return calc_cls(model=model_path, device=device)
-        except:
-            logger.warning(f"could not load the model from path {model_path}. proceeding with default.")
-    model_path = MACE_DEFAULT_MODEL_PATH
-    # model_fn = get_mace_model_registry.get((calculator, model), None)
-    # if model_fn:
-    #     model = os.path.join("/home/models", model_fn)
+    if mace_calculator:
+        mace_calculator = mace_calculator.lower()
+    for calculator_type, calculator_alias in zip(MACE_CALCULATOR_TYPES, MACE_CALCULATOR_ALIASES):
+        if not mace_calculator or mace_calculator == calculator_type or mace_calculator == calculator_alias:
+            try:
+                calc_cls = getattr(mace.calculators, calculator_type)
+                return calc_cls(model=model_path, device=device, **kwargs)
+            except:
+                logger.warning(f"could not load using MACE calculator class: {calculator_type}.")
+    # if model_path:
+    #     try:
+    #         return calc_cls(model=model_path, device=device)
+    #     except:
+    #         logger.warning(f"could not load the model from path {model_path}. proceeding with default.")
+    logger.info("no valid model found. using default model and type...")
+    # model_path = MACE_DEFAULT_MODEL_PATH
+    # calc_cls = getattr(mace.calculators, "mace_omol")
     return calc_cls(model=model_path, device=device)
+
+DEFAULT_UPET_MODEL="pet-mad-s"
+@register_calculator("upet")
+def get_upet_calc(checkpoint_path=None, device=None, **kwargs):
+    from upet.calculator import UPETCalculator
+    if checkpoint_path:
+        try:
+            return UPETCalculator(checkpoint_path=checkpoint_path, device=device, **kwargs)
+        except:
+            logger.warning(f"could not load the model from path {checkpoint_path}. proceeding with default.")
+    return UPETCalculator(model=DEFAULT_UPET_MODEL, device=device)
