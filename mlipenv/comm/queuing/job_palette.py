@@ -11,7 +11,7 @@ from enum import Enum
 import json
 import abc
 
-from mlipenv.servers.util import unpack_args
+from mlipenv.comm.queuing.util import unpack_args
 
 logger = logging.getLogger(__name__)
 

@@ -1,72 +1,8 @@
-import traceback
 
-from mlipenv.servers.node_comm import *
-from mlipenv.servers.util import register_as_async
+import os
+import argparse
 
-class MLIPHandler(NodeCommHandler):
-
-    DEFAULT_PORT_ENV_VAR = 'MLIP_SOCKET_PORT'
-
-    def subclass_methods(self) -> 'dict[str,method]':
-        return {
-            "evaluate": self.evaluate,
-            "status": self.check_job_status,
-            "check_job_status": self.check_job_status,
-            "cancel": self.cancel_job,
-            "cancel_job": self.cancel_job,
-        }
-
-    @register_as_async
-    def evaluate(self, config=None, *args):
-        if config is None:
-            response = {
-                "stdout": "",
-                "stderr": "no args provided"
-            }
-        else:
-            # print("yo! :3")
-            try:
-                # brittle reference
-                job_id = self.server.scheduler.submit_job("mlipenv.manager", config)
-                response = {
-                    "stdout": f"job has been submitted. job_id = {job_id}",
-                    "stderr": ""
-                } 
-            except Exception:
-                response = {
-                    "stdout": "",
-                    "stderr": traceback.format_exc(limit=10)
-                }
-        return response 
-    
-    def check_job_status(self, job_id=None, *args):
-        try:
-            job_info = self.server.scheduler.query_job(job_id)
-
-            response = {
-                "stdout": f"Status(es):\n{'\n'.join(f"{job_id}: {job['status']}" for job_id, job in job_info.items())}",
-                "stderr": ""
-            } 
-        except Exception:
-            response = {
-                "stdout": "",
-                "stderr": traceback.format_exc(limit=10)
-            }
-        return response
-    
-    def cancel_job(self, job_id, *args):
-        try:
-            response = self.server.scheduler.cancel_job(job_id)
-            response = {
-                "stdout": response,
-                "stderr": ""
-            }
-        except Exception:
-            response = {
-                "stdout": "",
-                "stderr": traceback.format_exc(limit=10)
-            }
-        return response
+from mlipenv.comm.handlers import *
 
 
 if __name__ == "__main__":

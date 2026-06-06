@@ -7,11 +7,10 @@ import numpy as np
 from ase import Atoms
 # from Psience.Molecools.Evaluator import PropertyEvaluator
 
-from mlipenv.calculators import get_calc # , build_calculator_options
-from mlipenv.options import get_configuration
-from mlipenv.enums.output_enum import _output_file_registry
-from mlipenv.optimizers import BetterBFGS
-from mlipenv.util import load_multidim_parameter, build_calculator_options
+from mlipenv.exec.calculators import get_calc # , build_calculator_options
+from mlipenv.exec.options import get_configuration
+from mlipenv.exec.enums.output_enum import _output_file_registry
+from mlipenv.exec.util import load_multidim_parameter, build_calculator_options
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +113,7 @@ class EnergyRunner(BaseRunner):
         self.calculator_options, self.loose_calc_kwargs = build_calculator_options(calc_configuration_cls, **calculator_options)
     
     def result_getters(self):
-        getters = [*self.get_pes_derivatives]
+        getters = [self.get_pe_derivatives]
         return getters
     
     def get_output_with_defaults(self):
@@ -125,13 +124,13 @@ class EnergyRunner(BaseRunner):
         self.results = [self.atomize(atoms, coords, charge) 
                            for atoms, coords, charge in zip(self.atoms, self.coordinates, self.charge)]
 
-    def get_pes_derivatives(self, obj):
+    def get_pe_derivatives(self, obj):
         if self.energy_options.order == 0:
             derivative_dict = {"0": np.array(obj.get_potential_energy())}
         elif self.energy_options.order == 1:
             derivative_dict["1"] = np.array(obj.get_forces())
         else:
-            from mlipenv.differentiation import get_higher_derivatives
+            from mlipenv.exec.differentiation import get_higher_derivatives
             derivative_dict = get_higher_derivatives(obj, calculator=obj.calc, device=self.calculator_options.device, order=self.energy_options.order)
         self.derivative_dict = derivative_dict
         return list(derivative_dict.values())
@@ -262,10 +261,10 @@ class BetterOptimizationRunner(BaseOptimizationRunner):
     
     def run(self):
         t1=time.time()
-        from mlipenv.calculators import get_fairchem_predict_unit
+        from mlipenv.exec.calculators import get_fairchem_predict_unit
         predictor = get_fairchem_predict_unit(self.calculator_options.device)
         logger.info(f"loading time for calculator: {time.time()-t1:.3f} seconds.")
-
+        from mlipenv.exec.optimizers import BetterBFGS
         optimizers = [BetterBFGS(atoms, coords, charge, self.spin, idx)
                       for idx, (atoms, coords, charge) in enumerate(zip(self.atoms, self.coordinates, self.charge))]
         for optimizer in optimizers:

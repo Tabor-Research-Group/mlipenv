@@ -1,4 +1,3 @@
-
 def register_as_async(func):
     func.is_asynchronous = True
     return func
@@ -21,3 +20,4 @@ def unpack_args(args: str) -> dict:
     else:
         raise NotImplementedError
     return args
+

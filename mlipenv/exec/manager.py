@@ -1,7 +1,7 @@
 import os
 import logging
 
-from mlipenv.util import load_config, build_base_config
+from mlipenv.exec.util import load_config, build_base_config
 
 def configure_logger(base_config):
     log_file = base_config.log_file
@@ -21,7 +21,7 @@ def spy_optimizer(optimizer=None, **kwargs):
     return optimizer
 
 def get_runner_for_method(base_config, runner_args):
-    from mlipenv.runners import get_runner
+    from mlipenv.exec.runners import get_runner
     if base_config.method == "optimization":
         optimizer = spy_optimizer(**runner_args)
         return get_runner(optimizer)(base_config, **runner_args)
@@ -31,9 +31,9 @@ def get_runner_for_method(base_config, runner_args):
         raise NotImplementedError(f"Unknown method type: {base_config.method}")
 
 
-def execute_mlip_job(config_bundle):
-    config_args = load_config(config_bundle)
-    base_config, runner_args = build_base_config(**config_args)
+def execute_mlip_job(config_bundle, method=None):
+    full_loaded_config = load_config(config_bundle, method=method)
+    base_config, runner_args = build_base_config(**full_loaded_config)
     logger = configure_logger(base_config)
     logger.info("logger configured.")
     try:
@@ -42,6 +42,7 @@ def execute_mlip_job(config_bundle):
         runner.export_results()
     except Exception:
         logger.exception("Job failed.")
+        raise
 
 if __name__ == "__main__":
     import sys

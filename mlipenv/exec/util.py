@@ -1,7 +1,7 @@
 import os
 import logging
 
-from mlipenv.options import get_configuration
+from mlipenv.exec.options import get_configuration
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +80,9 @@ def convert_molecules_to_nparr(fp_like):
     atoms_list, coordinates_list, charge_list = map(list, zip(*[_convert_molecules_to_nparr(file) for file in files]))
     return atoms_list, coordinates_list, charge_list
 
-def load_config(config_bundle):
+def load_config(config_bundle, method=None):
     import json
-    from mlipenv.options import STRUCTURE_PATH_KEYS
+    from mlipenv.exec.options import STRUCTURE_PATH_KEYS
     if isinstance(config_bundle, str):
         if os.path.exists(config_bundle):
             with open(config_bundle, "r") as f:
@@ -105,6 +105,9 @@ def load_config(config_bundle):
         config["coordinates"] = coordinates
         config["charge"] = charge
         config.pop(found_structure_path_key, None)
+
+    if "method" not in config and method is not None:
+        config["method"] = method
     return config
 
 def load_multidim_parameter(parameter_bundle):

@@ -1,7 +1,7 @@
 import os
 import logging
 
-from mlipenv.util import find_file
+from mlipenv.exec.util import find_file
 
 logger = logging.getLogger(__name__)
 

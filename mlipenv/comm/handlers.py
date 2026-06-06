@@ -1,108 +1,25 @@
-"""
-A simple handler for running subprocess calls on
-different nodes in SLURM systems
-"""
-import abc
-import os
-import socket, socketserver, json, traceback, subprocess, threading
-import sys
 
-from mlipenv.servers.job_palette import JobScheduler
+import os
+import json
+import abc
+import threading
+import subprocess
+import socketserver
+import traceback
+
+from mlipenv.comm.servers import NodeCommUnixServer, NodeCommTCPServer
+from mlipenv.comm.util import infer_mode
+from mlipenv.comm.clients import BaseClient
+from mlipenv.comm.queuing.job_palette import JobScheduler
+import mlipenv.comm.enums as enums
+from mlipenv.comm.queuing.util import register_as_async
 
 __all__ = [
-    "NodeCommTCPServer",
-    "NodeCommUnixServer",
     "NodeCommHandler",
-    "NodeCommClient"
+    "ShellCommHandler",
+    "MLIPHandler",
+    "AsyncMLIPHandler",
 ]
-
-def infer_mode(connection):
-    if (
-            isinstance(connection, tuple)
-            and isinstance(connection[0], str) and isinstance(connection[1], int)
-    ):
-        mode = "TCP"
-    elif isinstance(connection, str):
-        mode = "Unix"
-    else:
-        raise ValueError(f"invalid connection spec {connection}")
-    return mode
-
-class NodeCommTCPServer(socketserver.ThreadingTCPServer):
-    allow_reuse_address = True
-
-    def __init__(self, connection, handler_cls, scheduler):
-        super().__init__(connection, handler_cls)
-        self.scheduler = scheduler
-
-class NodeCommUnixServer(socketserver.ThreadingUnixStreamServer):
-    allow_reuse_address = True
-
-    def server_bind(self):
-        """Called by constructor to bind the socket.
-
-        May be overridden.
-
-        """
-        
-        if self.allow_reuse_address:
-            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.socket.bind(self.server_address)
-        self.server_address = self.socket.getsockname()
-    
-    def __init__(self, connection, handler_cls, scheduler):
-        super().__init__(connection, handler_cls)
-        self.scheduler = scheduler
-
-class NodeCommClient:
-    def __init__(self, connection, timeout=10):
-        self.conn = connection
-        mode = infer_mode(connection)
-        if mode == "TCP":
-            self.mode = socket.AF_INET
-        elif mode == "Unix":
-            self.mode = socket.AF_UNIX
-        else:
-            raise NotImplementedError(mode)
-        self.timeout = timeout
-
-    SEND_CWD = True
-    def prep_command_env(self):
-        env = {}
-        if self.SEND_CWD:
-            env['pwd'] = os.getcwd()
-        return env
-
-    def communicate(self, command, args):
-        request = json.dumps({
-            "command": command,
-            "args": args,
-            "env": self.prep_command_env()
-        }) + "\n"
-        request = request.encode()
-
-        # Create a socket (SOCK_STREAM means a TCP socket)
-        mode = infer_mode(self.conn)
-        # print(f"Sending request over {mode}")
-        if mode == "Unix" and not os.path.exists(self.conn):
-            raise ValueError(f"socket file {self.conn} doesn't exist")
-        with socket.socket(self.mode, socket.SOCK_STREAM) as sock:
-            # Connect to server and send data
-            sock.connect(self.conn)
-            sock.settimeout(self.timeout)
-            sock.sendall(request)
-            # Receive data from the server and shut down
-            # if stuff is being printed to the console, we could send it intermittently?
-            sock.settimeout(100000)
-            body = b''
-            while b'\n' not in body:
-                body = body + sock.recv(1024)
-
-        response = json.loads(body.strip().decode())
-        msg = response.get("stdout","")
-        if len(msg) > 0: print(msg, file=sys.stdout)
-        msg = response.get("stderr","")
-        if len(msg) > 0: print(msg, file=sys.stderr)
 
 class NodeCommHandler(socketserver.StreamRequestHandler):
 
@@ -146,10 +63,10 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
     def method_dispatch(self): 
         return dict(
             {
-                "cd": self.change_pwd,
-                "pwd": self.get_pwd,
-                "exit": self.stop_server,
-                "shutdown": self.stop_server
+                enums.Methods.CD.value: self.change_pwd,
+                enums.Methods.PWD.value: self.get_pwd,
+                enums.Methods.EXIT.value: self.stop_server,
+                enums.Methods.SHUTDOWN.value: self.stop_server
             },
             **self.subclass_methods()
         )
@@ -261,13 +178,13 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
         return server_type
 
     @classmethod
-    def start_server(cls, connection=None, port=None):
+    def start_server(cls, connection=None, port=None, scheduler=False):
         # start the server; default binding is to localhost on port 9999
         connection = cls.infer_connection(connection, port)
         mode = infer_mode(connection)
         print(f"Starting server at {connection} over {mode}")
         server_type = cls.get_server_type(mode)
-        scheduler = JobScheduler()
+        scheduler = JobScheduler() if scheduler else None
         with server_type(connection, cls, scheduler) as server:
             cls.set_server(server)
             # Activate the server; this will keep running until you
@@ -293,7 +210,7 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
             "stderr": ""
         }
 
-    client_class = NodeCommClient
+    client_class = BaseClient
     @classmethod
     def client_request(cls, *args, client_class=None, connection=None):
         if client_class is None:
@@ -322,3 +239,106 @@ class ShellCommHandler(NodeCommHandler):
             def command(*args, _cmd=command, **kwargs):
                 return self.subprocess_response(*_cmd, *args, **kwargs)
         return command
+
+
+class MLIPHandler(NodeCommHandler):
+
+    DEFAULT_PORT_ENV_VAR = 'MLIP_SOCKET_PORT'
+
+    def subclass_methods(self) -> 'dict[str,method]':
+        return {
+            enums.MLIPMethods.EVALUATE.value: self.evaluate,
+        }
+
+    def evaluate(self, config=None, method=None, *args):
+        if config is None:
+            response = {
+                "stdout": "",
+                "stderr": "no args provided"
+            }
+        else:
+            try:
+                from mlipenv.exec.manager import execute_mlip_job
+                response = execute_mlip_job(config, method=method)
+                response = {
+                    "stdout": "" if response is None else response,
+                    "stderr": ""
+                } 
+            except Exception:
+                response = {
+                    "stdout": "",
+                    "stderr": traceback.format_exc(limit=10)
+                }
+        return response
+    
+    @classmethod
+    def start_server(cls, connection=None, port=None):
+        super().start_server(connection=connection, port=port, scheduler=False)
+
+class AsyncMLIPHandler(NodeCommHandler):
+
+    DEFAULT_PORT_ENV_VAR = 'MLIP_SOCKET_PORT'
+
+    def subclass_methods(self) -> 'dict[str,method]':
+        return {
+            enums.AsyncMLIPMethods.EVALUATE.value: self.evaluate,
+            enums.AsyncMLIPMethods.STATUS.value: self.check_job_status,
+            enums.AsyncMLIPMethods.CHECK_JOB_STATUS.value: self.check_job_status,
+            enums.AsyncMLIPMethods.CANCEL.value: self.cancel_job,
+            enums.AsyncMLIPMethods.CANCEL_JOB.value: self.cancel_job,
+        }
+
+    @register_as_async
+    def evaluate(self, config=None, method=None, *args):
+        if config is None:
+            response = {
+                "stdout": "",
+                "stderr": "no args provided"
+            }
+        else:
+            try:
+                # brittle reference
+                job_id = self.server.scheduler.submit_job("mlipenv.exec.manager", config)
+                response = {
+                    "stdout": f"job has been submitted. job_id = {job_id}",
+                    "stderr": ""
+                } 
+            except Exception:
+                response = {
+                    "stdout": "",
+                    "stderr": traceback.format_exc(limit=10)
+                }
+        return response 
+    
+    def check_job_status(self, job_id=None, *args):
+        try:
+            job_info = self.server.scheduler.query_job(job_id)
+
+            response = {
+                "stdout": f"Status(es):\n{'\n'.join(f"{job_id}: {job['status']}" for job_id, job in job_info.items())}",
+                "stderr": ""
+            } 
+        except Exception:
+            response = {
+                "stdout": "",
+                "stderr": traceback.format_exc(limit=10)
+            }
+        return response
+    
+    def cancel_job(self, job_id, *args):
+        try:
+            response = self.server.scheduler.cancel_job(job_id)
+            response = {
+                "stdout": response,
+                "stderr": ""
+            }
+        except Exception:
+            response = {
+                "stdout": "",
+                "stderr": traceback.format_exc(limit=10)
+            }
+        return response
+    
+    @classmethod
+    def start_server(cls, connection=None, port=None):
+        super().start_server(connection=connection, port=port, scheduler=True)
