@@ -307,7 +307,7 @@ class PsienceRunner(BaseRunner):
         self.mol_kwargs = kwargs
         self._results = []
         self._atoms = base_config.atoms
-        self._coords = base_config.coordinates
+        self._coords = np.asanyarray(base_config.coordinates)
         self.order = order
         self.output_file = output_file
         self._ref_mol = None
