@@ -299,7 +299,7 @@ class BetterOptimizationRunner(BaseOptimizationRunner):
 
 @register_runner("psience")
 class PsienceRunner(BaseRunner):
-    def __init__(self, base_config, *, tasks, output_file, **kwargs):
+    def __init__(self, base_config, *, tasks, output_file, order=None, **kwargs):
         super().__init__(base_config)
         if isinstance(tasks, str):
             tasks = [tasks]
@@ -308,7 +308,7 @@ class PsienceRunner(BaseRunner):
         self._results = []
         self._atoms = base_config.atoms
         self._coords = base_config.coordinates
-        self.order = base_config.order
+        self.order = order
         self.output_file = output_file
         self._ref_mol = None
         self._evaluators = {}
