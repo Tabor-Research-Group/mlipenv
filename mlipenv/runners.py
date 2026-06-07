@@ -299,7 +299,7 @@ class BetterOptimizationRunner(BaseOptimizationRunner):
 
 @register_runner("psience")
 class PsienceRunner(BaseRunner):
-    def __init__(self, base_config, *, tasks, **kwargs):
+    def __init__(self, base_config, *, tasks, output_file, **kwargs):
         super().__init__(base_config)
         if isinstance(tasks, str):
             tasks = [tasks]
@@ -308,12 +308,49 @@ class PsienceRunner(BaseRunner):
         self._results = []
         self._atoms = base_config.atoms
         self._coords = base_config.coordinates
+        self.order = base_config.order
+        self.output_file = output_file
+        self._ref_mol = None
+        self._evaluators = {}
 
+    def load_ref_mol(self):
+        from Psience.Molecools import Molecule
+        from McUtils.Data import UnitsData
 
-    def dispatch_on_task(self):
-        ...
+        if self._ref_mol is None:
+            coords = self._coords * UnitsData.convert("BohrRadius", "Angstroms")
+            if coords.ndim > 2:
+                coords = coords.reshape((-1,) + coords.shape[-2:])[0]
+            self._ref_mol = Molecule(
+                self._atoms,
+                coords,
+                **self.mol_kwargs
+            )
+        return self._ref_mol
+
+    def load_evaluator(self, key):
+        if key == 'energy':
+            return self._ref_mol.get_energy_evaluator()
+        elif key == 'charge':
+            return self._ref_mol.get_charge_evaluator()
+        elif key == 'dipole':
+            return self._ref_mol.get_dipole_evaluator()
+        else:
+            raise ValueError(f"Unknown evaluator {key}")
+
+    def dispatch_on_task(self, task):
+        if task == 'energy':
+            return self.load_evaluator('energy')(self._coords, order=self.order)
+        else:
+            raise ValueError(f"Unknown task {task}")
 
     def run(self):
         if len(self._results) == 0:
             for task in self.tasks:
                 subres = self.dispatch_on_task(task)
+                self._results.append(subres)
+
+    def export_results(self):
+        from McUtils.Scaffolding import write_flat_tree
+        write_flat_tree(self.output_file, {'results': self._results})
+        return {'output_file': self.output_file}
