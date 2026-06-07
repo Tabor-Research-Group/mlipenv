@@ -3,6 +3,7 @@ from io import StringIO
 from contextlib import redirect_stdout, redirect_stderr, contextmanager
 import traceback
 import logging
+import subprocess
 
 from .servers.node_comm import *
 
@@ -67,34 +68,42 @@ def main():
     parser.add_argument("-p", "--port",
                         default=os.environ.get(MLIPHandler.DEFAULT_PORT_ENV_VAR, os.environ.get("SESSION_ID")))
     parser.add_argument("-c", "--no_server", action="store_true", default=False)
-    parser.add_argument("-e", "--env", default='fairchem')
-    parser.add_argument("--allow_scipts",
-                        action="store_true",
-                        default=False)
+    parser.add_argument("-e", "--env", default=None)
+    # parser.add_argument("--allow_scipts",
+    #                     action="store_true",
+    #                     default=False)
     parser.add_argument("request_args",
                         nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
 
     if args.no_server:
-        import subprocess
-        subprocess.run(["conda", "run", "--no-capture-output", "-n", args.env] + args.request_args)
+        env = args.env
+        if args.env is None:
+            env = os.environ.get("MLIP_DEFAULT_ENVIRONMENT")
+        if isinstance(args.env, str) and args.env.lower() == "none":
+            env = None
 
-    port = args.port
-    if port is None:
-        raise ValueError(f"`{MLIPHandler.DEFAULT_PORT_ENV_VAR}` must be set at the environment level")
-    port = MLIPHandler.get_valid_port(port)
+        if env is None:
+            subprocess.run(args.request_args)
+        else:
+            subprocess.run(["conda", "run", "--no-capture-output", "-n", args.env] + args.request_args)
+    else:
+        port = args.port
+        if port is None:
+            raise ValueError(f"`{MLIPHandler.DEFAULT_PORT_ENV_VAR}` must be set at the environment level")
+        port = MLIPHandler.get_valid_port(port)
 
-    MLIP_CONNECTION = ('localhost', MLIPHandler.get_valid_port(port))
+        MLIP_CONNECTION = ('localhost', MLIPHandler.get_valid_port(port))
 
-    try:  # implicit server startup ping done for every request
-        MLIPHandler.start_server(connection=MLIP_CONNECTION)
-    except OSError:  # server exists
-        if not len(args.request_args):
-            print(f"Already serving on {MLIP_CONNECTION}")
-        pass
-    if len(args.request_args):
-        MLIPHandler.client_request(args.request_args[0], args.request_args[1:], connection=MLIP_CONNECTION)
+        try:  # implicit server startup ping done for every request
+            MLIPHandler.start_server(connection=MLIP_CONNECTION)
+        except OSError:  # server exists
+            if not len(args.request_args):
+                print(f"Already serving on {MLIP_CONNECTION}")
+            pass
+        if len(args.request_args):
+            MLIPHandler.client_request(args.request_args[0], args.request_args[1:], connection=MLIP_CONNECTION)
 
 if __name__ == "__main__":
     main()
