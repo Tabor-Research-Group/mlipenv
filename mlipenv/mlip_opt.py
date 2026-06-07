@@ -27,7 +27,7 @@ def get_optimizer(base_config, **runner_args):
     return get_runner(optimizer)(base_config, **runner_args)
     
 def get_runner_for_method(base_config, runner_args):
-    base_config.method = runner_args["method"]
+    base_config.method = runner_args.get("method", base_config.method)
     method_dispatch = METHOD_REGISTRY.get(base_config.method)
     if method_dispatch is None:
         method_dispatch = get_runner(base_config.method)
