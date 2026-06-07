@@ -31,6 +31,7 @@ class MLIPHandler(NodeCommHandler):
                 handler.close()
 
     CAPTURE_LOGS = True
+    TRACEBACK_LIMIT = None
     def evaluate(self, args):
         from mlipenv.mlip_opt import call_to_mlip_server
 
@@ -53,7 +54,7 @@ class MLIPHandler(NodeCommHandler):
             except:
                 response = {
                     "stdout": buffer.getvalue(),
-                    "stderr": traceback.format_exc(limit=10)
+                    "stderr": traceback.format_exc(limit=self.TRACEBACK_LIMIT)
                 }
 
         return response
@@ -105,7 +106,9 @@ def main():
                 print(f"Already serving on {MLIP_CONNECTION}")
             pass
         if len(args.request_args):
-            MLIPHandler.client_request(args.request_args[0], args.request_args[1:], connection=MLIP_CONNECTION)
+            MLIPHandler.client_request(args.request_args[0], args.request_args[1:],
+                                       connection=MLIP_CONNECTION,
+                                       print_response=True)
 
 if __name__ == "__main__":
     main()

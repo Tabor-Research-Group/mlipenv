@@ -63,7 +63,7 @@ class NodeCommClient:
             env['pwd'] = os.getcwd()
         return env
 
-    def communicate(self, command, args, print_response=True):
+    def communicate(self, command, args, print_response=None):
         request = json.dumps({
             "command": command,
             "args": args,
@@ -93,6 +93,8 @@ class NodeCommClient:
         except:
             raise ValueError(f"couldn't parse {body} as JSON")
         else:
+            if print_response is None:
+                print_response = len(response) == 2
             if print_response:
                 msg = response.get("stdout","")
                 if len(msg) > 0: print(msg, file=sys.stdout)
@@ -289,7 +291,7 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
 
     client_class = NodeCommClient
     @classmethod
-    def client_request(cls, *args, client_class=None, connection=None, print_response=True):
+    def client_request(cls, *args, client_class=None, connection=None, print_response=None):
         if client_class is None:
             client_class = cls.client_class
         if connection is None:
