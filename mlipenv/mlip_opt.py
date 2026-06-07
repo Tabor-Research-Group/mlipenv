@@ -3,20 +3,35 @@ from mlipenv.options import get_configuration
 from mlipenv.runners import get_runner
 from mlipenv.util import load_config
 
+METHOD_REGISTRY={}
+def register_method(key, method=None):
+    if method is None:
+        def register(method):
+            return register_method(key, method)
+        return register
+    else:
+        METHOD_REGISTRY[key] = method
+        return method
+def resolve_method(method):
+    return METHOD_REGISTRY[method]
+
 DEFAULT_OPTIMIZER="ase"
 def spy_optimizer(optimizer=None, **kwargs):
     if not optimizer:
         optimizer = kwargs.get("optimization_options", {}).get("optimizer", DEFAULT_OPTIMIZER)
     return optimizer
+
+@register_method("optimization")
+def get_optimizer(base_config, **runner_args):
+    optimizer = spy_optimizer(**runner_args)
+    return get_runner(optimizer)(base_config, **runner_args)
     
 def get_runner_for_method(base_config, runner_args):
-    if base_config.method == "optimization":
-        optimizer = spy_optimizer(**runner_args)
-        return get_runner(optimizer)(base_config, **runner_args)
-    elif base_config.method == "energy":
-        return get_runner("energy")(base_config, **runner_args)
-    else:
-        raise NotImplementedError(f"Unknown method type: {base_config.method}")
+    base_config.method = runner_args["method"]
+    method_dispatch = METHOD_REGISTRY.get(base_config.method)
+    if method_dispatch is None:
+        method_dispatch = get_runner(base_config.method)
+    return method_dispatch(base_config, **runner_args)
 
 def build_base_config(method, 
                       atoms, 

@@ -22,13 +22,30 @@ def register_runner(key, runner_factory=None):
         return register
     else:
         RUNNER_REGISTRY[key] = runner_factory
+        return runner_factory
 
 def get_runner(key):
-    return RUNNER_REGISTRY[key]
+    if isinstance(key, str):
+        return RUNNER_REGISTRY[key]
+    else:
+        return RUNNER_REGISTRY.get(key, key)
 
-class BaseRunner:
+class BaseRunner(metaclass=abc.ABCMeta):
+    def __init__(self, base_config, **kwargs):
+        self.config = base_config
+
+    @abc.abstractmethod
+    def run(self):
+        ...
+
+    @abc.abstractmethod
+    def export_results(self):
+        ...
+
+class NPZBatchExportRunner(BaseRunner):
     debug = os.environ.get("DEBUG")
     def __init__(self, base_config, **kwargs):
+        super().__init__(base_config)
         self.atoms = load_multidim_parameter(base_config.atoms)
         self.coordinates = np.asarray(load_multidim_parameter(base_config.coordinates), dtype=np.float32)
         self.charge = self.load_charge(base_config.charge)
@@ -73,19 +90,15 @@ class BaseRunner:
         return get_calc(**asdict(self.calculator_options))
 
     @abc.abstractmethod
-    def result_getters():
+    def result_getters(self):
         ...
     
     @abc.abstractmethod
     def get_output_with_defaults(self):
         ...
 
-    @abc.abstractmethod
-    def run(self):
-        ...
-
 @register_runner("energy")
-class EnergyRunner(BaseRunner):
+class EnergyRunner(NPZBatchExportRunner):
     def __init__(self, base_config, **kwargs):
         super().__init__(base_config)
         self.load_config_with_defaults(**kwargs)
@@ -115,7 +128,7 @@ class EnergyRunner(BaseRunner):
     def get_single_point_energy(self, obj):
         return np.array(obj.get_potential_energy())
 
-class BaseOptimizationRunner(BaseRunner):
+class BaseOptimizationRunner(NPZBatchExportRunner):
     def __init__(self, base_config, **kwargs):
         super().__init__(base_config, **kwargs)
         self.load_runner_configs(**kwargs)
@@ -219,7 +232,8 @@ class SciPyOptimizationRunner(BaseOptimizationRunner):
 class BetterOptimizationRunner(BaseOptimizationRunner):
     def __init__(self, base_config, **kwargs):
         if not os.environ["CALCULATOR"].lower() == "fairchem":
-            raise NotImplementedError(f"BetterOptimizationRunner is not currently written for {os.environ["CALCULATOR"]} calculator.")
+            calc = os.environ["CALCULATOR"]
+            raise NotImplementedError(f"BetterOptimizationRunner is not currently written for {calc} calculator.")
         super().__init__(base_config, **kwargs)
     
     def run(self):
@@ -282,3 +296,24 @@ class BetterOptimizationRunner(BaseOptimizationRunner):
         for optimizer in self.results:
             optimizer.write_trajectory(self.output_dir)
             optimizer.write_log(self.output_dir)
+
+@register_runner("psience")
+class PsienceRunner(BaseRunner):
+    def __init__(self, base_config, *, tasks, **kwargs):
+        super().__init__(base_config)
+        if isinstance(tasks, str):
+            tasks = [tasks]
+        self.tasks = tasks
+        self.mol_kwargs = kwargs
+        self._results = []
+        self._atoms = base_config.atoms
+        self._coords = base_config.coordinates
+
+
+    def dispatch_on_task(self):
+        ...
+
+    def run(self):
+        if len(self._results) == 0:
+            for task in self.tasks:
+                subres = self.dispatch_on_task(task)

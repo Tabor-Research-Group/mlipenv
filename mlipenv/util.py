@@ -1,5 +1,7 @@
 import os
 import logging
+import numpy as np
+import json
 
 from mlipenv.options import get_configuration
 
@@ -53,7 +55,7 @@ def convert_from_xyz(file):
         optional_info_line = f.readline()
         try:
             charge = int(optional_info_line.strip())
-        except:
+        except ValueError:
             charge = DEFAULT_CHARGE
         atoms, coordinates = zip(*[
             (m[0], m[1:]) for line in f.readlines() if (m := re.match(r'\s*([A-Za-z]+)\s+(-?\d*\.\d+|\d+)\s+(-?\d*\.\d+|\d+)\s+(-?\d*\.\d+|\d+)\s*', line).groups())
@@ -79,6 +81,53 @@ def convert_molecules_to_nparr(fp_like):
     atoms_list, coordinates_list, charge_list = map(list, zip(*[_convert_molecules_to_nparr(file) for file in files]))
     return atoms_list, coordinates_list, charge_list
 
+def _load_with_psience(file):
+    from McUtils.Data import UnitsData
+    from Psience.Molecools import Molecule
+    mol = Molecule.from_file(file)
+    return {'atoms': mol.atoms,
+            'coordinates': mol.coords * UnitsData.convert("BohrRadius", "Angstroms"),
+            'charge': mol.charge,
+            'spin': mol.spin}
+
+def _load_molecule_data(file):
+    if file.endswith(".xyz"):
+        try:
+            base_res = convert_from_xyz(file)
+        except:
+            base_res =  _load_with_psience(file)
+        atoms, coordinates, charge = base_res
+        return {'atoms': atoms, 'coordinates': coordinates, 'charge': charge}
+    elif file.endswith(".json"):
+        with open(file, "r") as f:
+            return json.loads(f.read())
+    elif file.endswith(".npz"):
+        config = np.load(file)
+        if all(key in config.files for key in ["key_map", "visited_keys", "aliases"]):
+            from McUtils.Scaffolding import read_flat_tree
+            config = read_flat_tree(file)
+        else:
+            config = {k:config[k] for k in config.files}
+        return config
+    elif file.endswith(".npy"):
+        return {'coordinates': np.load(file)}
+    else:
+        return _load_with_psience(file)
+
+def read_molecules(file_or_directory):
+    if os.path.isdir(file_or_directory):
+        files = [os.path.join(dp, fn) for dp, dn, fns in os.walk(file_or_directory) for fn in fns]
+    else:
+        files = [file_or_directory]
+
+    base_dicts = [_load_molecule_data(file) for file in files]
+    merge_keys = {}
+    for d in base_dicts:
+        for k,v in d.items():
+            if k not in merge_keys: merge_keys[k] = []
+            merge_keys[k].append(v)
+    return merge_keys
+
 def load_config(config_bundle):
     import json
     from mlipenv.options import STRUCTURE_PATH_KEYS
@@ -98,12 +147,8 @@ def load_config(config_bundle):
         raise NotImplementedError(f"Intractable input type: {type(config_bundle)}")
     found_structure_path_key = next((s for s in STRUCTURE_PATH_KEYS if s in config), None)
     if found_structure_path_key:
-        atoms, coordinates, charge = convert_molecules_to_nparr(config[found_structure_path_key])
-        # I give up. these keys are hard-coded.
-        config["atoms"] = atoms
-        config["coordinates"] = coordinates
-        config["charge"] = charge
-        config.pop(found_structure_path_key, None)
+        file = config.pop(found_structure_path_key)
+        config = read_molecules(file) | config
     return config
 
 def load_multidim_parameter(parameter_bundle):
@@ -125,10 +170,11 @@ def load_multidim_parameter(parameter_bundle):
         parameter = parameter_bundle
     return parameter
 
-
 def build_calculator_options(cls, **options):
     from dataclasses import fields
     entries = [f.name for f in fields(cls)]
     filtered_options = {k:v for k,v in options.items() if k in entries}
     extra_options = {k:v for k,v in options.items() if k not in entries}
     return cls(**filtered_options), extra_options
+
+

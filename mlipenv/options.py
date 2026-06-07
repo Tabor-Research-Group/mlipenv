@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Union
 
-STRUCTURE_PATH_KEYS=["structures", "structure_path", "xyz_files", "xyz"]
+STRUCTURE_PATH_KEYS=["structures", "structure_path", "xyz_files", "xyz", "system_data"]
 
 CONFIGURATION_REGISTRY={}
 def register_configuration(key, config_factory=None):
