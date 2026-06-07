@@ -33,7 +33,7 @@ def get_runner_for_method(base_config, runner_args):
         method_dispatch = get_runner(base_config.method)
     return method_dispatch(base_config, **runner_args)
 
-def build_base_config(method, 
+def build_base_config(method,
                       atoms, 
                       coordinates, 
                       charge, 
@@ -47,4 +47,4 @@ def call_to_mlip_server(config_bundle):
     base_config, runner_args = build_base_config(**config_args)
     runner = get_runner_for_method(base_config, runner_args)
     runner.run()
-    runner.export_results()
+    return runner.export_results()

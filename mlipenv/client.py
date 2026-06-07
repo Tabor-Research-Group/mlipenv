@@ -43,11 +43,13 @@ class MLIPHandler(NodeCommHandler):
             buffer = StringIO()
             try:
                 with self.redirect_logging(buffer, enabled=self.CAPTURE_LOGS), redirect_stdout(buffer), redirect_stderr(buffer):
-                    call_to_mlip_server(*args)
+                    res = call_to_mlip_server(*args)
                 response = {
                     "stdout": buffer.getvalue(),
                     "stderr": ""
                 }
+                if res is not None:
+                    response = response | res
             except:
                 response = {
                     "stdout": buffer.getvalue(),
