@@ -87,12 +87,16 @@ class NodeCommClient:
             body = b''
             while b'\n' not in body:
                 body = body + sock.recv(1024)
-
-        response = json.loads(body.strip().decode())
-        msg = response.get("stdout","")
-        if len(msg) > 0: print(msg, file=sys.stdout)
-        msg = response.get("stderr","")
-        if len(msg) > 0: print(msg, file=sys.stderr)
+        try:
+            body = body.strip().decode()
+            response = json.loads(body)
+        except:
+            raise ValueError(f"couldn't parse {body} as JSON")
+        else:
+            msg = response.get("stdout","")
+            if len(msg) > 0: print(msg, file=sys.stdout)
+            msg = response.get("stderr","")
+            if len(msg) > 0: print(msg, file=sys.stderr)
 
 class NodeCommHandler(socketserver.StreamRequestHandler):
 
