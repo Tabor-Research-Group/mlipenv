@@ -321,8 +321,11 @@ class PsienceRunner(BaseRunner):
             coords = self._coords * UnitsData.convert("BohrRadius", "Angstroms")
             if coords.ndim > 2:
                 coords = coords.reshape((-1,) + coords.shape[-2:])[0]
+            atoms = self._atoms
+            if not isinstance(atoms[0], (str, np.str_, int, np.integer)):
+                atoms = atoms[0]
             self._ref_mol = Molecule(
-                self._atoms,
+                atoms,
                 coords,
                 **self.mol_kwargs
             )
