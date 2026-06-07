@@ -334,11 +334,13 @@ class PsienceRunner(BaseRunner):
     def load_evaluator(self, key):
         ref = self.load_ref_mol()
         if key == 'energy':
-            return ref.get_energy_evaluator()
+            return ref.get_energy_function()
         elif key == 'charge':
-            return ref.get_charge_evaluator()
+            return ref.get_charge_function()
         elif key == 'dipole':
-            return ref.get_dipole_evaluator()
+            return ref.get_dipole_function()
+        elif key == 'polarizability':
+            return ref.get_dipole_polarizability_function()
         else:
             raise ValueError(f"Unknown evaluator {key}")
 
