@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import json
 
-from mlipenv.options import get_configuration
+from mlipenv.exec.options import get_configuration
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +26,9 @@ def build_optimization_config(config, optimization_options=None, calculator_opti
     config["calculator_options"] = calculator_options
 
 @register_config_builder("energy")
-def build_energy_config(config, **kwargs):
-    config["energy_options"] = kwargs
+def build_energy_config(config, energy_options=None, calculator_options=None):
+    config["energy_options"] = energy_options
+    config["calculator_options"] = calculator_options
 
 def configuration_builder(method, 
                           atoms, 
@@ -128,9 +129,9 @@ def read_molecules(file_or_directory):
             merge_keys[k].append(v)
     return merge_keys
 
-def load_config(config_bundle):
+def load_config(config_bundle, method=None):
     import json
-    from mlipenv.options import STRUCTURE_PATH_KEYS
+    from mlipenv.exec.options import STRUCTURE_PATH_KEYS
     if isinstance(config_bundle, str):
         if os.path.exists(config_bundle):
             with open(config_bundle, "r") as f:
@@ -149,6 +150,10 @@ def load_config(config_bundle):
     if found_structure_path_key:
         file = config.pop(found_structure_path_key)
         config = read_molecules(file) | config
+    
+    if "method" not in config and method is not None:
+        config["method"] = method
+
     return config
 
 def load_multidim_parameter(parameter_bundle):
@@ -177,4 +182,12 @@ def build_calculator_options(cls, **options):
     extra_options = {k:v for k,v in options.items() if k not in entries}
     return cls(**filtered_options), extra_options
 
-
+def build_base_config(method, 
+                      atoms, 
+                      coordinates, 
+                      charge, 
+                      spin, 
+                      output_dir=".",
+                      log_file=None,
+                    **kwargs):
+    return get_configuration("base")(method, atoms, coordinates, charge, spin, output_dir, log_file), kwargs

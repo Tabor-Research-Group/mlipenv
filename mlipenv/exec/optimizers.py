@@ -31,6 +31,9 @@ class BetterBFGS:
     def get_energy(self):
         return self.energy_history[-1]
     
+    def is_atom(self):
+        return len(self.atoms) == 1
+    
     def write_trajectory(self, output_dir):
         from ase import Atoms
         from ase.io import Trajectory
