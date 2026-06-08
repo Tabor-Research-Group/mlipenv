@@ -2,10 +2,22 @@ import logging
 
 import torch.autograd
 
+from .calculators import
+
 logger = logging.getLogger(__name__)
 
+differentiators = {}
+def register_differentiator(name, differentiator=None):
+    if differentiator is not None:
+        differentiators[name] = differentiator
+        return differentiator
+    else:
+        def register(differentiator):
+            return register_differentiator(name, differentiator)
+        return register
+
 def get_higher_derivatives(obj, calculator, device, order):
-    derivatives = differentiators[type(calculator)](obj, calculator, device, order)
+    derivatives = differentiators[resolve_differentiator_alias(calculator)](obj, calculator, device, order)
     return {str(i): derivative for i, derivative in enumerate(derivatives)}
 
 def autograd_derivative(func, pos, order, max_order):
@@ -22,6 +34,7 @@ def autograd_derivative(func, pos, order, max_order):
     derived_func = torch.stack(derived_func, dim=0).reshape(shape)
     return derived_func
 
+@register_differentiator('fairchem')
 def fairchem_differentiator(obj, calculator, device, order):
     from fairchem.core.calculate.ase_calculator import FAIRChemCalculator
     from fairchem.core.datasets.atomic_data import AtomicData
@@ -57,8 +70,3 @@ def fairchem_differentiator(obj, calculator, device, order):
         predictor.model.module.backbone.regress_config.forces = True
         predictor.model.module.backbone.regress_config.stress = True
     return outputs
-
-differentiators = {
-    'fairchem': fairchem_differentiator
-}
-

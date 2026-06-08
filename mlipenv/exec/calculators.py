@@ -5,7 +5,7 @@ from mlipenv.exec.util import find_file
 
 logger = logging.getLogger(__name__)
 
-
+CALCULATOR_ALIASES = {} # maps calculator types back to calculator names
 CALCULATOR_REGISTRY = {}
 def register_calculator(name, calc_factory=None):
     if calc_factory is None:
@@ -52,6 +52,8 @@ def get_fairchem_predict_unit(device, model="uma-s-1p1"):
 @register_calculator("fairchem")
 def get_fairchem_calc(device, model="uma-s-1p1", task_name="omol", **kwargs):
     from fairchem.core.calculate.ase_calculator import FAIRChemCalculator
+    CALCULATOR_ALIASES["fairchem"] = FAIRChemCalculator
+
     try:
         predictor = get_fairchem_predict_unit(device, model)
         return FAIRChemCalculator(predictor, task_name=task_name, **kwargs)
@@ -63,6 +65,8 @@ AIMNET_DEFAULT_CALC="aimnet2"
 @register_calculator("aimnet2")
 def get_aimnet_calc(model_path, **kwargs):
     from aimnet2calc import AIMNet2ASE
+    CALCULATOR_ALIASES["aimnet2"] = AIMNet2ASE
+
     if model_path:
         try:
             return AIMNet2ASE(base_calc=model_path, **kwargs)
@@ -76,6 +80,7 @@ MACE_CALCULATOR_ALIASES=["omol", "off", "mp", "anicc", "polar"]
 @register_calculator("mace")
 def get_mace_calc(model_path, mace_calculator, device, **kwargs):
     import mace.calculators
+
     if mace_calculator:
         mace_calculator = mace_calculator.lower()
     for calculator_type, calculator_alias in zip(MACE_CALCULATOR_TYPES, MACE_CALCULATOR_ALIASES):
@@ -93,6 +98,8 @@ def get_mace_calc(model_path, mace_calculator, device, **kwargs):
     logger.info("no valid model found. using default model and type...")
     # model_path = MACE_DEFAULT_MODEL_PATH
     # calc_cls = getattr(mace.calculators, "mace_omol")
+
+    CALCULATOR_ALIASES["mace"] = calc_cls #TODO: make this robust
     return calc_cls(model=model_path, device=device)
 
 DEFAULT_UPET_MODEL="pet-mad-s"
