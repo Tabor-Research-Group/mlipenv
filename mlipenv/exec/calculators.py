@@ -1,7 +1,7 @@
 import os
 import logging
 
-from mlipenv.util import find_file
+from mlipenv.exec.util import find_file
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ def register_calculator(name, calc_factory=None):
 
 def get_calc(*, calculator=None, **calculator_options):
     if calculator is None:
-        calculator = os.environ.get("CALCULATOR").lower()
+        calculator = os.environ.get("CALCULATOR")
     if isinstance(calculator, str):
         calculator = CALCULATOR_REGISTRY[calculator]
     return calculator(**calculator_options)

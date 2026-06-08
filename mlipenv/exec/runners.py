@@ -1,16 +1,16 @@
 import os
 import abc
 import logging
+import time
 
 import numpy as np
 from ase import Atoms
 # from Psience.Molecools.Evaluator import PropertyEvaluator
 
-from mlipenv.calculators import get_calc # , build_calculator_options
-from mlipenv.options import get_configuration
-from mlipenv.enums.output_enum import _output_file_registry
-from mlipenv.optimizers import BetterBFGS
-from mlipenv.util import load_multidim_parameter, build_calculator_options
+from mlipenv.exec.calculators import get_calc # , build_calculator_options
+from mlipenv.exec.options import get_configuration
+from mlipenv.exec.enums.output_enum import _output_file_registry
+from mlipenv.exec.util import load_multidim_parameter, build_calculator_options
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +27,10 @@ def get_runner(key):
     return RUNNER_REGISTRY[key]
 
 class BaseRunner:
-    debug = os.environ.get("DEBUG")
+    debug = os.environ.get("DEBUG", "").lower() == "true"
     def __init__(self, base_config, **kwargs):
         self.atoms = load_multidim_parameter(base_config.atoms)
-        self.coordinates = np.asarray(load_multidim_parameter(base_config.coordinates), dtype=np.float32)
+        self.coordinates = load_multidim_parameter(base_config.coordinates)
         self.charge = self.load_charge(base_config.charge)
         self.spin = base_config.spin
         self.output_dir = base_config.output_dir
@@ -88,32 +88,53 @@ class BaseRunner:
 class EnergyRunner(BaseRunner):
     def __init__(self, base_config, **kwargs):
         super().__init__(base_config)
-        self.load_config_with_defaults(**kwargs)
+        self.load_energy_configs(**kwargs)
+        t1=time.time()
+        self.calc = self.get_calc_for_runner()
+        logger.info(f"loading time for calculator: {time.time()-t1:.3f} seconds.")
 
-    def load_config_with_defaults(self, order=1, **kwargs):
-        self.energy_options = get_configuration("energy")(order)
+    # a lot of the functionality in here overlaps with OptimizationRunner.load_runner_configs.
+    def load_energy_configs(self, 
+                            energy_options, 
+                            calculator_options=None,
+                            **kwargs
+                            ):
+        calc_type = os.environ.get("CALCULATOR", "").lower()
+        self.energy_options = get_configuration("energy")(**energy_options)
+        try:
+            calc_configuration_cls = get_configuration(calc_type)
+        except:
+            calc_configuration_cls = get_configuration("calculator")
+        if not calculator_options:
+                calculator_options = dict()
+        if "device" not in calculator_options:
+            import torch.cuda
+            calculator_options["device"] = "cuda" if torch.cuda.is_available() else "cpu"
+        self.calculator_options, self.loose_calc_kwargs = build_calculator_options(calc_configuration_cls, **calculator_options)
     
     def result_getters(self):
-        getters = [self.get_single_point_energy]
-        if self.energy_options.order > 0:
-            getters.append(self.get_gradients)
+        getters = [self.get_pe_derivatives]
         return getters
     
     def get_output_with_defaults(self):
-        output_file_registry = _output_file_registry()
-        output_files = [output_file_registry["energies"].value]
-        if self.energy_options.order > 0:
-            output_files.append(output_file_registry["gradients"].value)
-        return [os.path.join(self.output_dir, file) for file in output_files]
+        derivatives_dname = "derivatives"
+        return [os.path.join(self.output_dir, derivatives_dname, f"{n}.npz") for n in range(self.energy_options.order)]
     
     def run(self):
         self.results = [self.atomize(atoms, coords, charge) 
                            for atoms, coords, charge in zip(self.atoms, self.coordinates, self.charge)]
 
-    def get_gradients(self, obj):
-        return np.array(obj.get_forces())
-    def get_single_point_energy(self, obj):
-        return np.array(obj.get_potential_energy())
+    def get_pe_derivatives(self, obj):
+        if self.energy_options.order == 0:
+            derivative_dict = {"0": np.array(obj.get_potential_energy())}
+        elif self.energy_options.order == 1:
+            derivative_dict["1"] = np.array(obj.get_forces())
+        else:
+            from mlipenv.exec.differentiation import get_higher_derivatives
+            derivative_dict = get_higher_derivatives(obj, calculator=obj.calc, device=self.calculator_options.device, order=self.energy_options.order)
+        self.derivative_dict = derivative_dict
+        return list(derivative_dict.values())
+        
 
 class BaseOptimizationRunner(BaseRunner):
     def __init__(self, base_config, **kwargs):
@@ -132,7 +153,7 @@ class BaseOptimizationRunner(BaseRunner):
                             calculator_options=None,
                             **kwargs
                             ):
-        config_type = os.environ["CALCULATOR"].lower()
+        config_type = os.environ.get("calculator", "").lower()
         self.optimization_options = get_configuration("optimization")(**optimization_options)
         try:
             configuration_cls = get_configuration(config_type)
@@ -165,7 +186,6 @@ class BaseOptimizationRunner(BaseRunner):
 @register_runner("ase")
 class ASEOptimizationRunner(BaseOptimizationRunner):
     def __init__(self, base_config, **kwargs):
-        import time
         super().__init__(base_config, **kwargs)
         self.run_count = 0
         t1=time.time()
@@ -200,9 +220,9 @@ class ASEOptimizationRunner(BaseOptimizationRunner):
             trajectory=os.path.join(self.output_dir, "trajectories", f"{self.run_count}.traj"),
             logfile=os.path.join(self.output_dir, "logs", f"{self.run_count}.log")
             )
-        print(f"running opt {self.run_count} for {self.optimization_options.steps} steps...")
+        logger.info(f"running opt {self.run_count} for {self.optimization_options.steps} steps...")
         opt.run(fmax=self.optimization_options.fmax, steps=self.optimization_options.steps)
-        print(f"done.")
+        logger.info(f"done.")
         self.run_count = self.run_count + 1
         return atoms
 
@@ -218,53 +238,55 @@ class SciPyOptimizationRunner(BaseOptimizationRunner):
 @register_runner("better")
 class BetterOptimizationRunner(BaseOptimizationRunner):
     def __init__(self, base_config, **kwargs):
-        if not os.environ["CALCULATOR"].lower() == "fairchem":
-            raise NotImplementedError(f"BetterOptimizationRunner is not currently written for {os.environ["CALCULATOR"]} calculator.")
+        if not os.environ.get("CALCULATOR", "").lower() == "fairchem":
+            raise NotImplementedError(f"BetterOptimizationRunner is not currently written for {os.environ.get('CALCULATOR', '')} calculator.")
         super().__init__(base_config, **kwargs)
+
+    def step_optimization(self, optimizers, predictor):
+        import torch
+        from fairchem.core.datasets.atomic_data import AtomicData, atomicdata_list_to_batch
+        atomic_data = [AtomicData.from_ase(optimizer.ase_atoms, task_name="omol", r_data_keys=["charge", "spin"])
+                           for optimizer in optimizers]
+        batch = atomicdata_list_to_batch(atomic_data)
+        t1 = time.time()
+        with torch.no_grad():
+            preds = predictor.predict(batch)
+        torch_time = time.time()-t1
+        t2 = time.time()
+        for j, optimizer in enumerate(optimizers):
+            optimizer.remember_energy(preds["energy"][j])
+            optimizer.optimize_and_update(preds["forces"][batch.batch == j], self.optimization_options.fmax)
+        bfgs_time = time.time()-t2
+        return torch_time, bfgs_time
     
     def run(self):
-        import torch
-        import time
         t1=time.time()
-        from mlipenv.calculators import get_fairchem_predict_unit
-        from fairchem.core.datasets.atomic_data import AtomicData, atomicdata_list_to_batch
+        from mlipenv.exec.calculators import get_fairchem_predict_unit
         predictor = get_fairchem_predict_unit(self.calculator_options.device)
         logger.info(f"loading time for calculator: {time.time()-t1:.3f} seconds.")
+        from mlipenv.exec.optimizers import BetterBFGS
         optimizers = [BetterBFGS(atoms, coords, charge, self.spin, idx)
                       for idx, (atoms, coords, charge) in enumerate(zip(self.atoms, self.coordinates, self.charge))]
+        for optimizer in optimizers:
+            if optimizer.is_atom():
+                torch_time, bfgs_time = self.step_optimization([optimizer], predictor)
+                logger.info(f"Single atom times. prediction: {torch_time:.3f} s. bfgs: {bfgs_time:.3f} s.")
+        
         torch_times = []
         bfgs_times = []
+        unconverged_optimizers = optimizers
         for i in range(self.optimization_options.steps):
-            unconverged_optimizers = [optimizer for optimizer in optimizers if not optimizer.converged]
+            unconverged_optimizers = [optimizer for optimizer in unconverged_optimizers if not optimizer.converged]
             logger.info(f"optimization step: {i}. num unconverged = {len(unconverged_optimizers)}/{len(optimizers)}")
             if not len(unconverged_optimizers):
                 break
-            # if self.debug and self.debug.lower() == "true":
-            #     print(f"step {i}")
-            #     print(f"num unconverged = {len(unconverged_optimizers)}")
-            atomic_data = [AtomicData.from_ase(optimizer.ase_atoms, task_name="omol", r_data_keys=["charge", "spin"])
-                           for optimizer in unconverged_optimizers]
-            batch = atomicdata_list_to_batch(atomic_data)
-            t1 = time.time()
-            with torch.no_grad():
-                preds = predictor.predict(batch)
-            torch_times.append(time.time()-t1)
-            t2 = time.time()
-            for j, optimizer in enumerate(unconverged_optimizers):
-                optimizer.remember_energy(preds["energy"][j])
-                optimizer.optimize_and_update(preds["forces"][batch.batch == j], self.optimization_options.fmax)
-            bfgs_times.append(time.time()-t2)
-            # if self.debug and self.debug.lower() == "true":
-            #     if hasattr(predictor.model.module.backbone.charge_embedding, "charges"):
-            #         all_charges = predictor.model.module.backbone.charge_embedding.charges
-            #         for atoms, charges in zip([uo.atoms for uo in unconverged_optimizers], all_charges):
-            #             print(atoms, charges, len(unconverged_optimizers))
-            #             for atom, charge in zip(atoms, charges):
-            #                 print(atom, charge)
-            #             print()
-        if self.debug and self.debug.lower() == "true":
-            print(f"torch times = {torch_times}")
-            print(f"bfgs times = {bfgs_times}")
+            torch_time, bfgs_time = self.step_optimization(unconverged_optimizers, predictor)
+            torch_times.append(torch_time)
+            bfgs_times.append(bfgs_time)
+            
+        if self.debug:
+            logger.info(f"torch times = {torch_times}")
+            logger.info(f"bfgs times = {bfgs_times}")
         self.results = optimizers
 
     def get_atom_symbols(self, obj):

@@ -38,6 +38,7 @@ class BaseConfiguration:
     charge: Union[float, List[float]]
     spin: float
     output_dir: str
+    log_file: str
     
 @dataclass
 @register_configuration("optimization")

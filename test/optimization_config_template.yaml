@@ -1,0 +1,39 @@
+job:
+  config:
+    method: optimization
+    atoms: test/atoms.npz
+    coordinates: test/coordinates.npz
+    charge: 0
+    spin: 1
+    output_dir: .
+    optimization_options:
+      optimizer: better
+      fmax: 0.02
+      steps: 500
+    calculator_options:
+      device: cpu
+    log_file: optimization.log
+
+runtime:
+  # 'local' or 'slurm'
+  manager: local
+
+environment:
+  package_bearer:
+      # accepts container || conda || venv
+      conda: "name of or path to conda environment"
+  vars:
+    debug: true
+    calculator: fairchem
+    model_cache_dir: /path/to/model/cache
+  # sbatch:
+  #   name: my_job
+  #   output: my_job_%j.out
+  #   time: 24:00:00
+  #   mem: 16G
+  #   ntasks: 1
+  #   cpus-per-task: 4
+  #   nodes: 1
+  #   partition: gpu
+  #   gres: gpu:1
+  

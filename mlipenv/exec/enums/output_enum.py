@@ -5,7 +5,7 @@ def _output_file_registry():
         "atoms": OutputFilesEnum.ATOMS,
         "coordinates": OutputFilesEnum.COORDINATES,
         "gradients": OutputFilesEnum.GRADIENTS,
-        "energies": OutputFilesEnum.ENERGIES
+        "energies": OutputFilesEnum.ENERGIES,
     }
 
 class OutputFilesEnum(Enum):
