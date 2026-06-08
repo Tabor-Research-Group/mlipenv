@@ -31,18 +31,23 @@ def get_runner_for_method(base_config, runner_args):
         raise NotImplementedError(f"Unknown method type: {base_config.method}")
 
 
-def execute_mlip_job(config_bundle, method=None):
+def execute_mlip_job(config_bundle, method=None, args=None, kwargs=None):
     full_loaded_config = load_config(config_bundle, method=method)
     base_config, runner_args = build_base_config(**full_loaded_config)
+    if args is not None and len(args) > 0:
+        runner_args['args'] = args
+    if kwargs is not None:
+        runner_args = runner_args | kwargs
     logger = configure_logger(base_config)
     logger.info("logger configured.")
     try:
         runner = get_runner_for_method(base_config, runner_args)
         runner.run()
-        runner.export_results()
+        response = runner.export_results()
     except Exception:
         logger.exception("Job failed.")
         raise
+    return response
 
 if __name__ == "__main__":
     import sys

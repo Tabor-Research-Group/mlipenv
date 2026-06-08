@@ -1,7 +1,6 @@
 import logging
 
 import torch.autograd
-from fairchem.core.calculate.ase_calculator import FAIRChemCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +23,7 @@ def autograd_derivative(func, pos, order, max_order):
     return derived_func
 
 def fairchem_differentiator(obj, calculator, device, order):
+    from fairchem.core.calculate.ase_calculator import FAIRChemCalculator
     from fairchem.core.datasets.atomic_data import AtomicData
 
     predictor = calculator.predictor
@@ -59,6 +59,6 @@ def fairchem_differentiator(obj, calculator, device, order):
     return outputs
 
 differentiators = {
-    FAIRChemCalculator: fairchem_differentiator
+    'fairchem': fairchem_differentiator
 }
 

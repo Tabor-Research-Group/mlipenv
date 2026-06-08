@@ -1,11 +1,15 @@
+from __future__ import annotations
 
 import os
+import io
 import json
 import abc
 import threading
 import subprocess
 import socketserver
 import traceback
+import logging
+from contextlib import redirect_stdout, redirect_stderr, contextmanager
 
 from mlipenv.comm.servers import NodeCommUnixServer, NodeCommTCPServer
 # from mlipenv.comm.util import infer_mode
@@ -270,32 +274,57 @@ class MLIPHandler(NodeCommHandler):
             enums.MLIPMethods.EVALUATE.value: self.evaluate,
         }
 
+    @contextmanager
+    def redirect_logging(self, buffer, logger=None, enabled=True):
+        if enabled:
+            root = logging.getLogger(logger)
+            root.setLevel(logging.INFO)
+            handler = logging.StreamHandler(buffer)
+            handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+            try:
+                root.addHandler(handler)
+                yield None
+            finally:
+                root.removeHandler(handler)
+                handler.close()
+
+    CAPTURE_LOGS = True
+    TRACEBACK_LIMIT = None
     def evaluate(self, config=None, method=None, *args):
-        if config is None:
+        from mlipenv.exec.manager import execute_mlip_job
+
+        if not len(args):
             response = {
                 "stdout": "",
                 "stderr": "no args provided"
             }
         else:
+            buffer = io.StringIO()
             try:
-                from mlipenv.exec.manager import execute_mlip_job
-                response = execute_mlip_job(config, method=method)
+                with (
+                    self.redirect_logging(buffer, enabled=self.CAPTURE_LOGS),
+                    redirect_stdout(buffer), redirect_stderr(buffer)
+                ):
+                    res = execute_mlip_job(config, method=method, args=args)
                 response = {
-                    "stdout": "" if response is None else response,
+                    "stdout": buffer.getvalue(),
                     "stderr": ""
-                } 
-            except Exception:
+                }
+                if res is not None:
+                    response = response | res
+            except:
                 response = {
-                    "stdout": "",
-                    "stderr": traceback.format_exc(limit=10)
+                    "stdout": buffer.getvalue(),
+                    "stderr": traceback.format_exc(limit=self.TRACEBACK_LIMIT)
                 }
         return response
-    
+
     @classmethod
     def start_server(cls, address=None, port=None, mode=None):
         super().start_server(address=address, port=port, mode=mode, scheduler=False)
 
 class AsyncMLIPHandler(NodeCommHandler):
+    server: NodeCommUnixServer | NodeCommTCPServer
 
     DEFAULT_PORT_ENV_VAR = 'MLIP_SOCKET_PORT'
 
@@ -334,8 +363,10 @@ class AsyncMLIPHandler(NodeCommHandler):
         try:
             job_info = self.server.scheduler.query_job(job_id)
 
+            # keep python3.10 compatible + more readable
+            stats = '\n'.join(f"{job_id}: {job['status']}" for job_id, job in job_info.items())
             response = {
-                "stdout": f"Status(es):\n{'\n'.join(f"{job_id}: {job['status']}" for job_id, job in job_info.items())}",
+                "stdout": f"Status(es):\n{stats}",
                 "stderr": ""
             } 
         except Exception:
