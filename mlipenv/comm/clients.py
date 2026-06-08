@@ -14,11 +14,11 @@ class BaseClient:
             connection: str | tuple = None,
             timeout: float = 10, 
     ):
-        self.conn = resolve_connection(connection, address, port)
+        self.conn = resolve_connection(address=address, port=port, connection=connection)
         mode = infer_mode(self.conn)
-        if mode == "TCP":
+        if mode == enums.ServerModes.TCP:
             self.mode = socket.AF_INET
-        elif mode == "Unix":
+        elif mode == enums.ServerModes.Unix:
             self.mode = socket.AF_UNIX
         else:
             raise NotImplementedError(mode)

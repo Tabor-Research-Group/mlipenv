@@ -11,6 +11,10 @@ class NodeCommTCPServer(socketserver.ThreadingTCPServer):
 class NodeCommUnixServer(socketserver.ThreadingUnixStreamServer):
     allow_reuse_address = True
 
+    def __init__(self, connection, handler_cls, scheduler=None):
+        super().__init__(connection, handler_cls)
+        self.scheduler = scheduler
+
     def server_bind(self):
         """Called by constructor to bind the socket.
         May be overridden.
@@ -21,6 +25,4 @@ class NodeCommUnixServer(socketserver.ThreadingUnixStreamServer):
         self.socket.bind(self.server_address)
         self.server_address = self.socket.getsockname()
     
-    def __init__(self, connection, handler_cls, scheduler=None):
-        super().__init__(connection, handler_cls)
-        self.scheduler = scheduler
+    

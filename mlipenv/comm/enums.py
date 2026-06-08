@@ -1,5 +1,9 @@
 from enum import Enum
 
+class ServerModes(Enum):
+    TCP = "tcp"
+    Unix = "unix"
+
 class Methods(Enum):
     CD = "cd"
     PWD = "pwd"

@@ -13,15 +13,17 @@ and then call its `start_server` method,
 ```
 handler.start_server()
 ```
-which accepts optional `connection` (either an address (TCP) or file system path (Unix)), and `port` arguments. Alternatively, this be accomplished by calling the `cli.py` file, exposed at the top level of the package, with no additional arguments.
-If this were to be provided in a containerized version, we would use ENTRYPOINT ["python", "cli.py"].
+which accepts optional `address` (either TCP host address or Unix file system path), and `port` arguments. Alternatively, this be accomplished by calling the `cli.py` file, exposed at the top level of the package, with no additional arguments.
+If this were to be provided in a containerized version, we would use `ENTRYPOINT ["python", "cli.py"]`.
 
 
 # Client
 Requests are sent to an mlipenv server through Client objects,
 ```
 from mlipenv.comm.clients import MLIPClient
-client = MLIPClient(connection=connection)
+client_from_connection = MLIPClient(connection=connection)
+tcp_client_from_components = MLIPClient(address=ip_address, port=port)
+unix_client_from_components = MLIPClient(address=fs_address)
 ```
 for the synchronous mlipenv server (MLIPHandler), requests can be sent to perform energy evaluations
 ```

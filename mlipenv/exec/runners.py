@@ -118,7 +118,7 @@ class EnergyRunner(BaseRunner):
     
     def get_output_with_defaults(self):
         derivatives_dname = "derivatives"
-        return [os.path.join(self.output_dir, derivatives_dname, f"{n}.npz") for n in range(self.order)]
+        return [os.path.join(self.output_dir, derivatives_dname, f"{n}.npz") for n in range(self.energy_options.order)]
     
     def run(self):
         self.results = [self.atomize(atoms, coords, charge) 

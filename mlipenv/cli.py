@@ -8,6 +8,8 @@ from mlipenv.comm.handlers import *
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", default=None)
+    parser.add_argument("-a", "--address", default=None)
+    parser.add_argument("-m", "--server_mode", default=None)
     parser.add_argument("-x", "--connection", default=None)
     parser.add_argument("--no_server", action="store_true", default=False)
     parser.add_argument("--config", default=None)
@@ -23,13 +25,14 @@ if __name__ == "__main__":
         subprocess.run(["conda", "run", "--no-capture-output", "-n", calculator] + runtime_args)
 
     port = args.port
-    # connection is annoying
+    address = args.address
+    mode = args.server_mode
     connection = args.connection
     handler = AsyncMLIPHandler if args.asynchronous else MLIPHandler
 
     if not len(args.request_args):
         try:
-            handler.start_server(connection=connection, port=port)
+            handler.start_server(address=address, port=port, mode=mode)
         except OSError:
             if not len(args.request_args):
                 print(f"Server already exists.")
@@ -40,7 +43,6 @@ if __name__ == "__main__":
         try:
             method, method_args = args.request_args[0], args.request_args[1:]
             method_args = method_args if args.config is None else args.config
-            # this connection here is oddly-formed
-            handler.client_request(method, method_args, connection=connection)
+            handler.client_request(method, method_args, address=address, port=port, mode=mode, connection=connection)
         except Exception:
             raise

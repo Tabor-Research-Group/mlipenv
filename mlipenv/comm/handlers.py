@@ -8,7 +8,7 @@ import socketserver
 import traceback
 
 from mlipenv.comm.servers import NodeCommUnixServer, NodeCommTCPServer
-from mlipenv.comm.util import infer_mode
+# from mlipenv.comm.util import infer_mode
 from mlipenv.comm.clients import BaseClient
 from mlipenv.comm.queuing.job_palette import JobScheduler
 import mlipenv.comm.enums as enums
@@ -141,21 +141,43 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
             port = max_port - (port % (max_port - min_port))
         return port
 
-    DEFAULT_CONNECTION = ("localhost", 9999)
+    DEFAULT_TCP_ADDRESS = "localhost"
+    DEFAULT_PORT = 9999
+    DEFAULT_TCP_CONNECTION = (DEFAULT_TCP_ADDRESS, DEFAULT_PORT)
     DEFAULT_PORT_ENV_VAR = None
     DEFAULT_SOCKET_ENV_VAR = None
     @classmethod
-    def infer_connection(cls, connection, port):
-        if connection is None and cls.DEFAULT_SOCKET_ENV_VAR is not None:
-            connection = os.environ.get(cls.DEFAULT_SOCKET_ENV_VAR)
-        if connection is None:
+    def infer_connection_from_mode(cls, address, port, mode):
+        if mode == enums.ServerModes.TCP:
+            if address is None:
+                address = cls.DEFAULT_TCP_ADDRESS
             if port is None and cls.DEFAULT_PORT_ENV_VAR:
                 port = os.environ.get(cls.DEFAULT_PORT_ENV_VAR)
-            if port is not None:
-                connection = ('localhost', cls.get_valid_port(port))
-        if connection is None:
-            connection = cls.DEFAULT_CONNECTION
+                if port is None:
+                    port = cls.DEFAULT_PORT
+            connection = (address, cls.get_valid_port(port))
+        elif mode == enums.ServerModes.Unix:
+            if address is None and cls.DEFAULT_SOCKET_ENV_VAR is not None:
+                address = os.environ.get(cls.DEFAULT_SOCKET_ENV_VAR)
+            connection = address
+        else:    
+            raise NotImplementedError(f"mode {mode} is not implemented.")
         return connection
+    
+    @classmethod
+    def infer_mode_and_connection(cls, address, port, mode):
+        if mode is not None:
+            if isinstance(mode, str):
+                mode = enums.ServerModes(mode.lower())
+            return mode, cls.infer_connection_from_mode(address, port, mode)
+        
+        if port is None and cls.DEFAULT_PORT_ENV_VAR is not None:
+            port = os.environ.get(cls.DEFAULT_PORT_ENV_VAR)
+        if port is not None:
+            mode = enums.ServerModes.TCP
+            return mode, cls.infer_connection_from_mode(address, port, mode=mode)
+        mode = enums.ServerModes.Unix
+        return mode, cls.infer_connection_from_mode(address, port, mode=mode)
 
     @classmethod
     def set_server(cls, server):
@@ -169,20 +191,18 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
     UNIX_SERVER = NodeCommUnixServer
     @classmethod
     def get_server_type(cls, mode):
-        if mode == "TCP":
+        if mode == enums.ServerModes.TCP:
             server_type = cls.TCP_SERVER
-        elif mode == "Unix":
+        elif mode == enums.ServerModes.Unix:
             server_type = cls.UNIX_SERVER
         else:
             raise NotImplementedError(mode)
         return server_type
-
+    
     @classmethod
-    def start_server(cls, connection=None, port=None, scheduler=False):
-        # start the server; default binding is to localhost on port 9999
-        connection = cls.infer_connection(connection, port)
-        mode = infer_mode(connection)
-        print(f"Starting server at {connection} over {mode}")
+    def start_server(cls, address=None, port=None, mode=None, scheduler=False):
+        mode, connection = cls.infer_mode_and_connection(address, port, mode)
+        print(f"Starting server at {connection} over {mode.name}")
         server_type = cls.get_server_type(mode)
         scheduler = JobScheduler() if scheduler else None
         with server_type(connection, cls, scheduler) as server:
@@ -212,11 +232,11 @@ class NodeCommHandler(socketserver.StreamRequestHandler):
 
     client_class = BaseClient
     @classmethod
-    def client_request(cls, *args, client_class=None, connection=None):
+    def client_request(cls, *args, client_class=None, address=None, port=None, mode=None, connection=None):
         if client_class is None:
             client_class = cls.client_class
         if connection is None:
-            connection = cls.DEFAULT_CONNECTION
+            _, connection = cls.infer_mode_and_connection(address, port, mode)
         return client_class(connection).communicate(*args)
 
 class ShellCommHandler(NodeCommHandler):
@@ -272,8 +292,8 @@ class MLIPHandler(NodeCommHandler):
         return response
     
     @classmethod
-    def start_server(cls, connection=None, port=None):
-        super().start_server(connection=connection, port=port, scheduler=False)
+    def start_server(cls, address=None, port=None, mode=None):
+        super().start_server(address=address, port=port, mode=mode, scheduler=False)
 
 class AsyncMLIPHandler(NodeCommHandler):
 
@@ -340,5 +360,5 @@ class AsyncMLIPHandler(NodeCommHandler):
         return response
     
     @classmethod
-    def start_server(cls, connection=None, port=None):
-        super().start_server(connection=connection, port=port, scheduler=True)
+    def start_server(cls, address=None, port=None, mode=None):
+        super().start_server(address=address, port=port, mode=mode, scheduler=True)
